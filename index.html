@@ -5,10 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Tablero de Instrumentación - Batería de Petróleo</title>
     
-    <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
 
-    <!-- React & Libraries -->
     <script type="importmap">
         {
             "imports": {
@@ -37,7 +35,6 @@
         .select-edit { border: 1px solid #e2e8f0; border-radius: 4px; padding: 2px; font-size: 0.75rem; background-color: white; width: 100%; cursor: pointer; }
         .select-edit:focus { border-color: #3b82f6; outline: none; }
         
-        /* Estilo específico para input date */
         input[type="date"]::-webkit-calendar-picker-indicator { cursor: pointer; opacity: 0.6; }
         input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; }
 
@@ -55,7 +52,7 @@
         import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, PieChart, Pie, Cell, ResponsiveContainer, Label, LabelList } from 'recharts';
         import { AlertCircle, CheckCircle, Clock, Activity, Upload, Trash2, HardHat, Download, X, AlertTriangle, Target, Layers, FileSpreadsheet, LayoutDashboard, ChevronDown, ChevronRight, Boxes, PlayCircle, Wrench, Zap, Hammer, FileWarning, Package, Truck, ClipboardCheck, Edit3, Save, Eye, EyeOff, FileCheck, RefreshCw, CalendarDays, Search } from 'lucide-react';
 
-        // --- DATOS INICIALES DEMO (SISTEMA) ---
+        // --- DATOS INICIALES DEMO ---
         const initialSystemData = [
             { especialidad: "Instrumentacion (I)", tag: "TI-801B", descripcion: "Termometro", sistema: "011", descSistema: "Recepcion", subsistema: "001", descSubsistema: "Ingreso", skid: "ON", almacen: "EN OBRA", aCalibrar: "1", provision: "YPF", cantRegTot: "2", cantRegReal: "2", estado1: "", estado2: "INST" },
             { especialidad: "Instrumentacion (I)", tag: "C-LY107", descripcion: "Cable", sistema: "014", descSistema: "Tratamiento Agua", subsistema: "001", descSubsistema: "Skimmer", skid: "", almacen: "", aCalibrar: "0", provision: "", cantRegTot: "1", cantRegReal: "0", estado1: "", estado2: "" },
@@ -63,8 +60,6 @@
             { especialidad: "Mecánica", tag: "V-101", descripcion: "Separador", sistema: "010", descSistema: "Separación", subsistema: "002", descSubsistema: "V-101", skid: "SK-V101", almacen: "", aCalibrar: "0", provision: "", cantRegTot: "5", cantRegReal: "3", estado1: "", estado2: "" },
         ];
         
-        // --- DATOS INICIALES DEMO (REGISTRO INSTRUMENTOS) ---
-        // Formato fecha YYYY-MM-DD para compatibilidad con input date
         const initialRegData = [
              { skid: "ON", ubicacion: "PENDIENTE", tag: "AIT-107", lab: "CIS", fCalib: "2026-01-19", estadoReg: "PRESENTADO", fGen: "2026-01-20", fPres: "2026-01-23", fDev: "", ubicReg: "INSPECCIÓN", montado: "SIN MONTAR" },
              { skid: "ON", ubicacion: "EN OBRA", tag: "BDV-102C", lab: "", fCalib: "2025-11-29", estadoReg: "FIRMADO", fGen: "2025-11-29", fPres: "2025-11-29", fDev: "2025-11-29", ubicReg: "PRECOM", montado: "MONTADO" },
@@ -72,14 +67,10 @@
         ];
 
         const COLORS = { blue: "#3b82f6", green: "#10b981", orange: "#f97316", red: "#ef4444", yellow: "#eab308", purple: "#a855f7", indigo: "#6366f1", gray: "#64748b" };
-        const GOAL_COLORS = ['#15803d', '#e2e8f0'];
 
-        // --- FUNCIONES AUXILIARES ---
-        // Convierte DD/MM/YYYY a YYYY-MM-DD para que el input date lo reconozca
         const normalizeDate = (dateStr) => {
             if (!dateStr) return "";
             const cleanStr = dateStr.trim();
-            // Detectar formato DD/MM/YYYY o D/M/YYYY
             const match = cleanStr.match(/^(\d{1,2})[\/-](\d{1,2})[\/-](\d{4})$/);
             if (match) {
                 const day = match[1].padStart(2, '0');
@@ -87,11 +78,10 @@
                 const year = match[3];
                 return `${year}-${month}-${day}`;
             }
-            // Si ya es YYYY-MM-DD o formato desconocido, devolver tal cual
             return cleanStr;
         };
 
-        // --- COMPONENTES UI AUXILIARES ---
+        // --- COMPONENTES UI ---
         const ConfirmModal = ({ isOpen, onClose, onConfirm, title, message }) => {
             if (!isOpen) return null;
             return (
@@ -171,7 +161,6 @@
             );
         };
 
-        // --- KPI INSTRUMENTACIÓN CRÍTICO (SISTEMAS) ---
         const CalibrableKPI = ({ stats }) => {
             if (!stats) return null;
             return (
@@ -239,7 +228,6 @@
             );
         };
 
-        // --- FILA DE EDICIÓN (ABM SISTEMAS) ---
         const TagEditRow = ({ tagItem, onEdit, skidOptions, almacenOptions }) => {
             let rowColor = "hover:bg-slate-50";
             if (tagItem.calculatedStatus === "INSTALADO") rowColor = "bg-green-50/60";
@@ -249,39 +237,26 @@
                 <tr className={`border-b border-slate-100 transition-colors ${rowColor}`}>
                     <td className="px-4 py-2 font-medium text-slate-800 w-32">{tagItem.tag}</td>
                     <td className="px-4 py-2 text-slate-500 text-[10px] truncate max-w-[150px]" title={tagItem.desc}>{tagItem.desc}</td>
-                    
                     <td className="px-2 py-1">
-                        <select 
-                            className="select-edit" 
-                            value={tagItem.skid} 
-                            onChange={(e) => onEdit(tagItem.tag, 'skid', e.target.value)}
-                        >
+                        <select className="select-edit" value={tagItem.skid} onChange={(e) => onEdit(tagItem.tag, 'skid', e.target.value)}>
                             <option value="">-</option>
                             {skidOptions.map(opt => <option key={opt} value={opt}>{opt}</option>)}
                         </select>
                     </td>
-                    
                     <td className="px-2 py-1">
-                        <select 
-                            className="select-edit" 
-                            value={tagItem.almacen} 
-                            onChange={(e) => onEdit(tagItem.tag, 'almacen', e.target.value)}
-                        >
+                        <select className="select-edit" value={tagItem.almacen} onChange={(e) => onEdit(tagItem.tag, 'almacen', e.target.value)}>
                             <option value="">-</option>
                             {almacenOptions.map(opt => <option key={opt} value={opt}>{opt}</option>)}
                         </select>
                     </td>
-                    
                     <td className="px-2 py-1 text-center w-20">
                         <select className="select-edit text-center" value={tagItem.aCalibrar} onChange={(e) => onEdit(tagItem.tag, 'aCalibrar', e.target.value)}>
                             <option value="0">NO</option>
                             <option value="1">SI</option>
                         </select>
                     </td>
-                    
                     <td className="px-2 py-1 w-16"><input type="number" className="input-edit text-center" value={tagItem.cantRegTot} onChange={(e) => onEdit(tagItem.tag, 'cantRegTot', e.target.value)} placeholder="0"/></td>
                     <td className="px-2 py-1 w-16"><input type="number" className="input-edit text-center" value={tagItem.cantRegReal} onChange={(e) => onEdit(tagItem.tag, 'cantRegReal', e.target.value)} placeholder="0"/></td>
-
                     <td className="px-2 py-1 text-center w-32">
                          <span className={`text-[10px] font-bold px-2 py-1 rounded border ${tagItem.calculatedStatus === 'INSTALADO' ? 'text-green-700 bg-green-100 border-green-200' : tagItem.calculatedStatus === 'EN PROCESO' ? 'text-yellow-700 bg-yellow-100 border-yellow-200' : 'text-slate-400 bg-slate-100 border-slate-200'}`}>
                             {tagItem.calculatedStatus}
@@ -291,7 +266,6 @@
             );
         };
 
-        // --- GRUPO ESPECIALIDAD ---
         const SpecialtyGroup = ({ specialtyName, tags, onEdit, skidOptions, almacenOptions }) => {
             const [isExpanded, setIsExpanded] = useState(false);
             const total = tags.length;
@@ -334,7 +308,6 @@
             );
         };
 
-        // --- SUBSISTEMA ---
         const ExpandableRow = ({ sys, isExpanded, onToggle, onEdit, skidOptions, almacenOptions }) => {
             const groupedTags = useMemo(() => {
                 const groups = {};
@@ -360,12 +333,23 @@
 
         // --- APP PRINCIPAL ---
         function InstrumentDashboard() {
-            const [matrixData, setMatrixData] = useState(initialSystemData);
-            const [regData, setRegData] = useState(initialRegData); 
+            // Inicializar estados desde localStorage para evitar pérdida de datos al refrescar
+            const [matrixData, setMatrixData] = useState(() => {
+                const saved = localStorage.getItem('matrixData');
+                return saved ? JSON.parse(saved) : initialSystemData;
+            });
+            const [regData, setRegData] = useState(() => {
+                const saved = localStorage.getItem('regData');
+                return saved ? JSON.parse(saved) : initialRegData;
+            });
+            const [manualEdits, setManualEdits] = useState(() => {
+                const saved = localStorage.getItem('manualEdits');
+                return saved ? JSON.parse(saved) : {};
+            });
+
             const [activeTab, setActiveTab] = useState("dashboard"); 
             const [filter, setFilter] = useState("TODOS");
             const [expandedRows, setExpandedRows] = useState({}); 
-            const [manualEdits, setManualEdits] = useState({});
             
             const fileInputRef = useRef(null);
             const regInputRef = useRef(null); 
@@ -381,6 +365,11 @@
             const [skidOptions, setSkidOptions] = useState([]);
             const [almacenOptions, setAlmacenOptions] = useState([]);
 
+            // Sincronizar automáticamente con localStorage al cambiar cualquier dato
+            useEffect(() => { localStorage.setItem('matrixData', JSON.stringify(matrixData)); }, [matrixData]);
+            useEffect(() => { localStorage.setItem('regData', JSON.stringify(regData)); }, [regData]);
+            useEffect(() => { localStorage.setItem('manualEdits', JSON.stringify(manualEdits)); }, [manualEdits]);
+
             useEffect(() => {
                 const uniqueSkids = new Set();
                 const uniqueAlmacenes = new Set();
@@ -393,9 +382,12 @@
                 setAlmacenOptions(Array.from(uniqueAlmacenes).sort());
             }, [matrixData]);
 
-            // Handlers
             const performClearData = () => {
+                // Limpiar estados y memoria local
                 setMatrixData([]); setRegData([]); setManualEdits({}); setUploadStats(null); setFilter("TODOS"); setExpandedRows({});
+                localStorage.removeItem('matrixData');
+                localStorage.removeItem('regData');
+                localStorage.removeItem('manualEdits');
                 if (fileInputRef.current) fileInputRef.current.value = "";
                 if (regInputRef.current) regInputRef.current.value = "";
                 setIsDeleteModalOpen(false);
@@ -418,12 +410,10 @@
                 });
             };
             
-            // --- ABM para REGISTRO DE INSTRUMENTOS ---
             const handleRegEdit = (tag, field, value) => {
                 setRegData(prev => {
                     return prev.map(item => {
                         if(item.tag === tag) {
-                            // Si se cambia una fecha, se intenta calcular el estado automáticamente, pero se permite override
                             let newState = item.estadoDoc;
                             if (field === 'fDev' && value) newState = "FINALIZADO";
                             else if (field === 'fPres' && value) newState = "EN INSPECCIÓN";
@@ -477,7 +467,6 @@
 
                     if (specName && allowed.includes(specName)) {
                         if (!grouped[specName]) grouped[specName] = { name: specName, total: 0, mounted: 0, percent: 0, logistics: { onSkid: 0, offSkid: 0, enAlmacen: 0, enObra: 0 }, calibStats: { total: 0, mounted: 0 } };
-                        
                         grouped[specName].total++;
                         if (isMounted) grouped[specName].mounted++;
 
@@ -487,7 +476,6 @@
                             else if (skidVal === "OFF") grouped[specName].logistics.offSkid++;
 
                             const almVal = (effAlm || "").trim().toUpperCase();
-                            
                             if (almVal === "EN OBRA" || isMounted || isInProgress) { 
                                 grouped[specName].logistics.enObra++;
                             } else if (almVal !== "") {
@@ -513,14 +501,12 @@
                 filteredMatrixData.forEach(item => {
                     const tag = item.tag?.trim();
                     const edit = manualEdits[tag];
-                    
                     const state = calculateState(item, edit);
                     const isMounted = state === "INSTALADO";
                     const isInProgress = state === "EN PROCESO";
                     const key = `${item.sistema || '000'}|${item.subsistema || '000'}`;
 
                     if (!grouped[key]) grouped[key] = { id: key, sistema: `${item.sistema} - ${item.descSistema}`, descSistema: item.descSistema, subsistema: `${item.subsistema} - ${item.descSubsistema}`, descSubsistema: item.descSubsistema, totalTags: 0, mountedTags: 0, tags: [] };
-
                     grouped[key].totalTags++;
                     if (isMounted) grouped[key].mountedTags++;
                     
@@ -540,24 +526,16 @@
 
             const flatData = useMemo(() => {
                 return regData.map(item => {
-                     // Nueva lógica basada en Fechas
                      let status = "PENDIENTE";
                      if (item.fDev && item.fDev.trim() !== "") status = "FINALIZADO";
                      else if (item.fPres && item.fPres.trim() !== "") status = "EN INSPECCIÓN";
                      else if (item.fGen && item.fGen.trim() !== "") status = "EN LABORATORIO";
                      
-                     // Ubicación física (prioriza Montado si dice algo distinto a SIN MONTAR)
                      const fisica = (item.montado && item.montado.trim().toUpperCase() !== "SIN MONTAR" && item.montado.trim() !== "") ? "EN OBRA" : (item.ubicacion || "PENDIENTE");
 
                      return {
-                         tag: item.tag,
-                         ubicacion: fisica,
-                         proveedor: item.lab || "-", 
-                         estadoDoc: status, 
-                         fechaGen: item.fGen,
-                         fechaPres: item.fPres,
-                         fechaDev: item.fDev,
-                         montado: item.montado 
+                         tag: item.tag, ubicacion: fisica, proveedor: item.lab || "-", estadoDoc: status, 
+                         fechaGen: item.fGen, fechaPres: item.fPres, fechaDev: item.fDev, montado: item.montado 
                      };
                 });
             }, [regData]);
@@ -565,26 +543,20 @@
             const globalProgress = useMemo(() => {
                 let sumTot = 0; let sumReal = 0;
                 const processedTags = new Set();
-        
                 filteredMatrixData.forEach(item => {
                     const tag = item.tag?.trim();
                     if (!tag || processedTags.has(tag)) return;
                     processedTags.add(tag);
-        
                     const edit = manualEdits[tag];
                     const valTot = parseInt(edit?.cantRegTot !== undefined ? edit.cantRegTot : item.cantRegTot) || 0;
                     const valReal = parseInt(edit?.cantRegReal !== undefined ? edit.cantRegReal : item.cantRegReal) || 0;
-        
-                    sumTot += valTot;
-                    sumReal += valReal;
+                    sumTot += valTot; sumReal += valReal;
                 });
-        
                 return sumTot === 0 ? "0.0" : ((sumReal / sumTot) * 100).toFixed(1);
             }, [filteredMatrixData, manualEdits]);
 
             const startedSubsystems = useMemo(() => systemsStats.filter(s => s.mountedTags > 0).length, [systemsStats]);
 
-            // File Handlers
             const handleMatrixUpload = (e) => { 
                 const file = e.target.files[0]; 
                 if(!file) return; 
@@ -617,44 +589,25 @@
                         if (i === 0) return; 
                         const c = r.split(del); 
                         const tagVal = c[idx.tag]?.trim();
-                        
-                        if(tagVal && tagVal.toUpperCase() !== "TAG" && !tagVal.toUpperCase().includes("DESCRIPCION")) {
+                        if(tagVal && tagVal.toUpperCase() !== "TAG") {
                             newData.push({
-                                especialidad: c[idx.spec]?.trim() || "",
-                                tag: tagVal,
-                                descripcion: c[idx.desc]?.trim() || "",
-                                sistema: c[idx.sis]?.trim() || "",
-                                descSistema: c[idx.sisDesc]?.trim() || "",
-                                subsistema: c[idx.sub]?.trim() || "",
-                                descSubsistema: c[idx.subDesc]?.trim() || "",
-                                skid: c[idx.skid]?.trim() || "",
-                                almacen: c[idx.alm]?.trim() || "",
-                                aCalibrar: c[idx.calib]?.trim() || "",
-                                provision: c[idx.prov]?.trim() || "",
-                                cantRegTot: c[idx.cTot]?.trim() || "0",
-                                cantRegReal: c[idx.cReal]?.trim() || "0",
-                                estado1: c[idx.est1]?.trim() || "",
-                                estado2: c[idx.est2]?.trim() || ""
+                                especialidad: c[idx.spec]?.trim() || "", tag: tagVal, descripcion: c[idx.desc]?.trim() || "",
+                                sistema: c[idx.sis]?.trim() || "", descSistema: c[idx.sisDesc]?.trim() || "",
+                                subsistema: c[idx.sub]?.trim() || "", descSubsistema: c[idx.subDesc]?.trim() || "",
+                                skid: c[idx.skid]?.trim() || "", almacen: c[idx.alm]?.trim() || "",
+                                aCalibrar: c[idx.calib]?.trim() || "", provision: c[idx.prov]?.trim() || "",
+                                cantRegTot: c[idx.cTot]?.trim() || "0", cantRegReal: c[idx.cReal]?.trim() || "0",
+                                estado1: c[idx.est1]?.trim() || "", estado2: c[idx.est2]?.trim() || ""
                             });
                         } 
                     }); 
 
-                    let modCount = 0;
-                    let newCount = 0;
+                    let modCount = 0; let newCount = 0;
                     const currentMap = new Map(matrixData.map(d => [d.tag, d]));
                     newData.forEach(newItem => {
                         const currentItem = currentMap.get(newItem.tag);
-                        if (!currentItem) {
-                            newCount++;
-                        } else {
-                            // Detectar cambios en campos clave
-                            if (newItem.skid !== currentItem.skid || 
-                                newItem.almacen !== currentItem.almacen || 
-                                newItem.cantRegReal !== currentItem.cantRegReal ||
-                                newItem.aCalibrar !== currentItem.aCalibrar) {
-                                modCount++;
-                            }
-                        }
+                        if (!currentItem) newCount++;
+                        else if (newItem.skid !== currentItem.skid || newItem.almacen !== currentItem.almacen || newItem.cantRegReal !== currentItem.cantRegReal || newItem.aCalibrar !== currentItem.aCalibrar) modCount++;
                     });
 
                     setPendingData(newData);
@@ -692,17 +645,10 @@
                         const c = r.split(del);
                         if(c[idx.tag]) {
                             newData.push({
-                                tag: c[idx.tag]?.trim(),
-                                skid: c[idx.skid]?.trim(),
-                                ubicacion: c[idx.ubic]?.trim(),
-                                lab: c[idx.lab]?.trim(),
-                                fCalib: normalizeDate(c[idx.fCalib]),
-                                estadoReg: c[idx.estReg]?.trim(),
-                                fGen: normalizeDate(c[idx.fGen]),
-                                fPres: normalizeDate(c[idx.fPres]),
-                                fDev: normalizeDate(c[idx.fDev]),
-                                ubicReg: c[idx.ubicReg]?.trim(),
-                                montado: c[idx.montado]?.trim()
+                                tag: c[idx.tag]?.trim(), skid: c[idx.skid]?.trim(), ubicacion: c[idx.ubic]?.trim(), lab: c[idx.lab]?.trim(),
+                                fCalib: normalizeDate(c[idx.fCalib]), estadoReg: c[idx.estReg]?.trim(), fGen: normalizeDate(c[idx.fGen]),
+                                fPres: normalizeDate(c[idx.fPres]), fDev: normalizeDate(c[idx.fDev]),
+                                ubicReg: c[idx.ubicReg]?.trim(), montado: c[idx.montado]?.trim()
                             });
                         }
                     });
@@ -726,7 +672,6 @@
             };
 
             const downloadExport = () => {
-                // EXPORT 1: MATRIZ SISTEMAS
                 let csvMatrix = "ESPECIALIDAD;TAG;DESC;SIS;DESC_SIS;SUBSIS;DESC_SUBSIS;SKID;ALMACEN;A CALIBRAR;PROVISION;C_TOT;C_REAL;ESTADO_1;ESTADO_2\n";
                 matrixData.forEach(d => { 
                     const ed = manualEdits[d.tag]; 
@@ -741,22 +686,18 @@
                 const urlMatrix = URL.createObjectURL(new Blob([csvMatrix], {type:'text/csv'}));
                 const aMatrix = document.createElement('a'); aMatrix.href = urlMatrix; aMatrix.download = `Matriz_Avance_${new Date().toISOString().slice(0,10)}.csv`; aMatrix.click();
 
-                // EXPORT 2: REGISTRO INSTRUMENTOS
                 let csvReg = "TAG;SKID;UBICACION;CALIB.LABT.;FECHA CALIB.;ESTADO REGIST.;GENERADO;PRESENTADO;DEVOLUCION;UBICACIÓN DE REGISTRO;MONTADO\n";
                 regData.forEach(d => {
                     csvReg += `${d.tag};${d.skid};${d.ubicacion};${d.lab};${d.fCalib};${d.estadoReg};${d.fGen};${d.fPres};${d.fDev};${d.ubicReg};${d.montado}\n`;
                 });
                 const urlReg = URL.createObjectURL(new Blob([csvReg], {type:'text/csv'}));
                 const aReg = document.createElement('a'); aReg.href = urlReg; aReg.download = `Registro_Instrumentos_${new Date().toISOString().slice(0,10)}.csv`; aReg.click();
-
-                setIsExportModalOpen(false); 
             };
 
             const docStatusCounts = useMemo(() => {
                 const counts = flatData.reduce((acc, curr) => { 
                     const st = curr.estadoDoc || "PENDIENTE";
-                    acc[st] = (acc[st] || 0) + 1; 
-                    return acc; 
+                    acc[st] = (acc[st] || 0) + 1; return acc; 
                 }, {});
                 return Object.keys(counts).map(key => ({ name: key, value: counts[key] }));
             }, [flatData]);
@@ -764,8 +705,7 @@
             const physStatusCounts = useMemo(() => {
                 const counts = flatData.reduce((acc, curr) => { 
                     const st = curr.ubicacion || "PENDIENTE";
-                    acc[st] = (acc[st] || 0) + 1; 
-                    return acc; 
+                    acc[st] = (acc[st] || 0) + 1; return acc; 
                 }, {});
                 return Object.keys(counts).map(key => ({ name: key, value: counts[key] }));
             }, [flatData]);
@@ -773,8 +713,7 @@
             const labCounts = useMemo(() => {
                  const counts = flatData.reduce((acc, curr) => {
                     const lab = curr.proveedor && curr.proveedor !== "-" ? curr.proveedor : "SIN ASIGNAR";
-                    acc[lab] = (acc[lab] || 0) + 1;
-                    return acc;
+                    acc[lab] = (acc[lab] || 0) + 1; return acc;
                  }, {});
                  return Object.keys(counts).map(key => ({ name: key, value: counts[key] }));
             }, [flatData]);
@@ -790,7 +729,7 @@
                     <div className="flex flex-col gap-4 mb-6">
                         <div className="flex flex-col xl:flex-row justify-between items-center bg-white p-6 rounded-lg shadow-sm border border-slate-200">
                             <div>
-                                <h1 className="text-3xl font-bold text-slate-800 flex items-center gap-3">Seguimiento de Obra {uploadStats && <span className="text-xs bg-green-100 text-green-800 px-2 py-1 rounded-full">Cargado: {uploadStats.type}</span>}</h1>
+                                <h1 className="text-3xl font-bold text-slate-800 flex items-center gap-3">Seguimiento de Obra</h1>
                                 <p className="text-slate-500">Gestión Unificada de Matriz de Ingeniería y Avance</p>
                             </div>
                             <div className="flex gap-2 mt-4 xl:mt-0">
@@ -827,9 +766,7 @@
                                             <XAxis type="number" />
                                             <YAxis dataKey="name" type="category" width={100} tick={{fontSize: 10}} />
                                             <Tooltip />
-                                            <Bar dataKey="value" fill="#3b82f6" radius={[0,4,4,0]}>
-                                                 <LabelList dataKey="value" position="right" />
-                                            </Bar>
+                                            <Bar dataKey="value" fill="#3b82f6" radius={[0,4,4,0]}><LabelList dataKey="value" position="right" /></Bar>
                                         </BarChart>
                                     </ResponsiveContainer>
                                 </div>
@@ -840,8 +777,7 @@
                                             <Pie data={physStatusCounts} cx="50%" cy="50%" innerRadius={40} outerRadius={70} fill="#8884d8" paddingAngle={5} dataKey="value" label>
                                                 {physStatusCounts.map((entry, index) => <Cell key={`cell-${index}`} fill={Object.values(COLORS)[index % Object.values(COLORS).length]} />)}
                                             </Pie>
-                                            <Tooltip />
-                                            <Legend />
+                                            <Tooltip /><Legend />
                                         </PieChart>
                                     </ResponsiveContainer>
                                 </div>
@@ -852,8 +788,7 @@
                                             <Pie data={labCounts} cx="50%" cy="50%" innerRadius={0} outerRadius={70} fill="#82ca9d" paddingAngle={5} dataKey="value" label>
                                                 {labCounts.map((entry, index) => <Cell key={`cell-${index}`} fill={Object.values(COLORS)[(index + 2) % Object.values(COLORS).length]} />)}
                                             </Pie>
-                                            <Tooltip />
-                                            <Legend />
+                                            <Tooltip /><Legend />
                                         </PieChart>
                                     </ResponsiveContainer>
                                 </div>
@@ -863,24 +798,14 @@
                                 <div className="p-5 border-b border-slate-200 flex justify-between items-center bg-slate-50">
                                     <h3 className="text-lg font-bold text-slate-700">Listado de Registros (ABM)</h3>
                                     <select className="select-edit w-48" value={filter} onChange={(e) => setFilter(e.target.value)}>
-                                        <option value="TODOS">Todos</option>
-                                        <option value="FINALIZADO">Finalizados</option>
-                                        <option value="EN INSPECCIÓN">En Inspección</option>
-                                        <option value="EN OBRA">En Obra</option>
+                                        <option value="TODOS">Todos</option><option value="FINALIZADO">Finalizados</option><option value="EN INSPECCIÓN">En Inspección</option><option value="EN OBRA">En Obra</option>
                                     </select>
                                 </div>
                                 <div className="overflow-x-auto max-h-96">
                                     <table className="w-full text-sm text-left text-slate-600">
                                         <thead className="text-xs text-slate-700 uppercase bg-slate-100 sticky top-0">
                                             <tr>
-                                                <th className="px-6 py-3">TAG</th>
-                                                <th className="px-2 py-3 w-32">Lab</th>
-                                                <th className="px-2 py-3 w-32">Generado</th>
-                                                <th className="px-2 py-3 w-32">Presentado</th>
-                                                <th className="px-2 py-3 w-32">Devolución</th>
-                                                <th className="px-6 py-3">Estado Doc.</th>
-                                                <th className="px-6 py-3 font-bold text-right">Ubicación</th>
-                                                <th className="px-2 py-3 text-center w-32">Montado</th>
+                                                <th className="px-6 py-3">TAG</th><th className="px-2 py-3 w-32">Lab</th><th className="px-2 py-3 w-32">Generado</th><th className="px-2 py-3 w-32">Presentado</th><th className="px-2 py-3 w-32">Devolución</th><th className="px-6 py-3">Estado Doc.</th><th className="px-6 py-3 font-bold text-right">Ubicación</th><th className="px-2 py-3 text-center w-32">Montado</th>
                                             </tr>
                                         </thead>
                                         <tbody className="divide-y divide-slate-100">
@@ -889,10 +814,7 @@
                                                     <td className="px-6 py-3 font-medium">{row.tag}</td>
                                                     <td className="px-2 py-1">
                                                         <select className="select-edit" value={row.proveedor} onChange={(e) => handleRegEdit(row.tag, 'lab', e.target.value)}>
-                                                            <option value="">-</option>
-                                                            <option value="Pecom">Pecom</option>
-                                                            <option value="CIS">CIS</option>
-                                                            <option value="WEISZ">WEISZ</option>
+                                                            <option value="">-</option><option value="Pecom">Pecom</option><option value="CIS">CIS</option><option value="WEISZ">WEISZ</option>
                                                         </select>
                                                     </td>
                                                     <td className="px-2 py-1"><input type="date" className="input-edit" value={row.fechaGen} onChange={(e) => handleRegEdit(row.tag, 'fGen', e.target.value)}/></td>
@@ -902,8 +824,7 @@
                                                     <td className="px-6 py-3 font-bold text-right text-slate-600">{row.ubicacion}</td>
                                                     <td className="px-2 py-1">
                                                         <select className="select-edit" value={row.montado} onChange={(e) => handleRegEdit(row.tag, 'montado', e.target.value)}>
-                                                            <option value="SIN MONTAR">SIN MONTAR</option>
-                                                            <option value="MONTADO">MONTADO</option>
+                                                            <option value="SIN MONTAR">SIN MONTAR</option><option value="MONTADO">MONTADO</option>
                                                         </select>
                                                     </td>
                                                 </tr>
@@ -917,53 +838,24 @@
 
                     {activeTab === 'systems' && (
                         <div className="animate-enter">
-                            {/* ... (Todo el contenido de la pestaña Systems se mantiene igual) ... */}
                             <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
-                                <div className="bg-white p-4 rounded-lg shadow border-l-4 border-purple-500">
-                                    <h3 className="text-sm font-medium text-gray-500 uppercase">Subsistemas</h3>
-                                    <p className="text-3xl font-bold text-gray-800">{systemsStats.length}</p>
-                                </div>
-                                <div className="bg-white p-4 rounded-lg shadow border-l-4 border-orange-500">
-                                    <h3 className="text-sm font-medium text-gray-500 uppercase">Iniciados</h3>
-                                    <p className="text-3xl font-bold text-gray-800 flex items-center gap-2">
-                                        {startedSubsystems}
-                                        <span className="text-sm font-normal text-gray-400">({systemsStats.length > 0 ? ((startedSubsystems / systemsStats.length) * 100).toFixed(0) : 0}%)</span>
-                                    </p>
-                                </div>
-                                <div className="bg-white p-4 rounded-lg shadow border-l-4 border-blue-500">
-                                    <h3 className="text-sm font-medium text-gray-500 uppercase">Total Tags</h3>
-                                    <p className="text-3xl font-bold text-gray-800">{filteredMatrixData.length}</p>
-                                </div>
-                                <div className="bg-white p-4 rounded-lg shadow border-l-4 border-green-600">
-                                    <h3 className="text-sm font-medium text-gray-500 uppercase">Avance Global</h3>
-                                    <p className="text-3xl font-bold text-gray-800 flex items-center gap-2">
-                                        {globalProgress}%
-                                        <Activity size={20} className="text-green-500"/>
-                                    </p>
-                                </div>
+                                <div className="bg-white p-4 rounded-lg shadow border-l-4 border-purple-500"><h3 className="text-sm font-medium text-gray-500 uppercase">Subsistemas</h3><p className="text-3xl font-bold text-gray-800">{systemsStats.length}</p></div>
+                                <div className="bg-white p-4 rounded-lg shadow border-l-4 border-orange-500"><h3 className="text-sm font-medium text-gray-500 uppercase">Iniciados</h3><p className="text-3xl font-bold text-gray-800 flex items-center gap-2">{startedSubsystems}<span className="text-sm font-normal text-gray-400">({systemsStats.length > 0 ? ((startedSubsystems / systemsStats.length) * 100).toFixed(0) : 0}%)</span></p></div>
+                                <div className="bg-white p-4 rounded-lg shadow border-l-4 border-blue-500"><h3 className="text-sm font-medium text-gray-500 uppercase">Total Tags</h3><p className="text-3xl font-bold text-gray-800">{filteredMatrixData.length}</p></div>
+                                <div className="bg-white p-4 rounded-lg shadow border-l-4 border-green-600"><h3 className="text-sm font-medium text-gray-500 uppercase">Avance Global</h3><p className="text-3xl font-bold text-gray-800 flex items-center gap-2">{globalProgress}%<Activity size={20} className="text-green-500"/></p></div>
                             </div>
-
                             <div className="mb-8 flex flex-col gap-6">
                                 {specialtyStats.find(s => s.name === "Instrumentación") && (
-                                    <CalibrableKPI stats={specialtyStats.find(s => s.name === "Instrumentación").calibStats ? {
-                                        ...specialtyStats.find(s => s.name === "Instrumentación").calibStats,
-                                        percent: specialtyStats.find(s => s.name === "Instrumentación").calibPercent,
-                                        logistics: specialtyStats.find(s => s.name === "Instrumentación").logistics
-                                    } : null} />
+                                    <CalibrableKPI stats={specialtyStats.find(s => s.name === "Instrumentación").calibStats ? { ...specialtyStats.find(s => s.name === "Instrumentación").calibStats, percent: specialtyStats.find(s => s.name === "Instrumentación").calibPercent, logistics: specialtyStats.find(s => s.name === "Instrumentación").logistics } : null} />
                                 )}
-
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                     {specialtyStats.find(s => s.name === "Instrumentación") && <SpecialtyCard spec={{...specialtyStats.find(s => s.name === "Instrumentación"), isTotal: true}} color="blue"/>}
                                     {specialtyStats.find(s => s.name === "Piping") && <SpecialtyCard spec={specialtyStats.find(s => s.name === "Piping")} color="indigo"/>}
                                 </div>
-
                                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                                    {specialtyStats.filter(s => !["Instrumentación", "Piping"].includes(s.name)).map((spec, idx) => (
-                                        <SpecialtyCard key={idx} spec={spec} color={spec.name === "Electricidad" ? "yellow" : spec.name === "Civil" ? "orange" : "gray"}/>
-                                    ))}
+                                    {specialtyStats.filter(s => !["Instrumentación", "Piping"].includes(s.name)).map((spec, idx) => (<SpecialtyCard key={idx} spec={spec} color={spec.name === "Electricidad" ? "yellow" : spec.name === "Civil" ? "orange" : "gray"}/>))}
                                 </div>
                             </div>
-
                             <div className="bg-white rounded-lg shadow overflow-hidden border border-slate-200">
                                 <div className="p-4 bg-slate-50 border-b border-slate-200 font-bold text-slate-700">Detalle de Montaje por Subsistema (ABM)</div>
                                 <div className="overflow-x-auto">
@@ -972,9 +864,7 @@
                                             <tr><th className="px-6 py-3">Sistema</th><th className="px-6 py-3">Subsistema</th><th className="px-6 py-3 text-center">Total</th><th className="px-6 py-3 text-center">Instalado</th><th className="px-6 py-3 w-32">Avance</th></tr>
                                         </thead>
                                         <tbody className="divide-y divide-slate-100">
-                                            {systemsStats.map((sys) => (
-                                                <ExpandableRow key={sys.id} sys={sys} isExpanded={expandedRows[sys.id]} onToggle={() => toggleRow(sys.id)} onEdit={handleTagEdit} skidOptions={skidOptions} almacenOptions={almacenOptions}/>
-                                            ))}
+                                            {systemsStats.map((sys) => (<ExpandableRow key={sys.id} sys={sys} isExpanded={expandedRows[sys.id]} onToggle={() => toggleRow(sys.id)} onEdit={handleTagEdit} skidOptions={skidOptions} almacenOptions={almacenOptions}/>))}
                                         </tbody>
                                     </table>
                                 </div>
