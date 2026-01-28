@@ -40,6 +40,9 @@
         .select-edit { border: 1px solid #e2e8f0; border-radius: 4px; padding: 2px; font-size: 0.75rem; background-color: white; width: 100%; cursor: pointer; }
         .select-edit:disabled { background-color: #f1f5f9; cursor: not-allowed; }
         
+        /* Estilo para input date */
+        input[type="date"] { cursor: pointer; }
+        
         .animate-enter { animation: fadeIn 0.3s ease-out forwards; }
         @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
     </style>
@@ -56,8 +59,8 @@
         import { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged } from "firebase/auth";
         import { getFirestore, doc, setDoc, getDoc, collection, getDocs, onSnapshot } from "firebase/firestore";
 
-        // GLOBAL APP ID
-        const appId = typeof __app_id !== 'undefined' ? __app_id : 'instrument-dashboard-v1';
+        // GLOBAL APP ID (Critical for path resolution)
+        const appId = 'instrument-dashboard-v1';
 
         // --- CONSTANTES & DATA ---
         const initialSystemData = [
@@ -163,9 +166,8 @@
             const [newUserRole, setNewUserRole] = useState('viewer');
             const [loading, setLoading] = useState(false);
             const [msg, setMsg] = useState('');
-            
-            // Fix: Construct collection reference correctly with proper path segments
-            // Path: artifacts/{appId}/public/data/user_roles/{email} -> 'user_roles' is the collection
+
+            // Reference to the user_roles collection
             const rolesCollection = useMemo(() => db ? collection(db, 'artifacts', appId, 'public', 'data', 'user_roles') : null, [db]);
 
             useEffect(() => {
@@ -243,9 +245,39 @@
             );
         };
 
-        // --- MAIN APP ---
+        const ExpandableRow = ({ sys, isExpanded, onToggle, onEdit, skidOptions, almacenOptions, readOnly }) => {
+             const groupedTags = useMemo(() => {
+                const groups = {};
+                sys.tags.forEach(t => { const spec = t.specialty || "Sin Especialidad"; if (!groups[spec]) groups[spec] = []; groups[spec].push(t); });
+                return groups;
+            }, [sys.tags]);
+            return (
+                <>
+                    <tr className={`bg-white hover:bg-blue-50 transition-colors border-b border-slate-100 cursor-pointer ${isExpanded ? 'bg-slate-50 border-l-4 border-l-blue-500' : ''}`} onClick={onToggle}>
+                         <td className="px-6 py-4"><div className="flex items-center gap-2 text-slate-500">{isExpanded ? <ChevronDown size={18} /> : <ChevronRight size={18} />}<span className="font-medium text-slate-800 text-sm">{sys.sistema}</span></div><div className="text-xs text-slate-400 pl-6">{sys.descSistema}</div></td>
+                        <td className="px-6 py-4"><div className="font-medium text-slate-700 text-sm">{sys.subsistema}</div><div className="text-xs text-slate-400">{sys.descSubsistema}</div></td>
+                        <td className="px-6 py-4 text-center font-bold text-slate-700 text-sm">{sys.totalTags}</td>
+                        <td className="px-6 py-4 text-center"><span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold ${sys.mountedTags > 0 ? 'bg-green-100 text-green-800' : 'bg-slate-100 text-slate-500'}`}>{sys.mountedTags}</span></td>
+                        <td className="px-6 py-4"><div className="flex items-center gap-3"><span className="text-xs font-bold w-8 text-right">{sys.percent}%</span><div className="w-full bg-slate-200 rounded-full h-2 mt-1"><div className={`h-2 rounded-full transition-all duration-500 ${parseFloat(sys.percent)===100?'bg-green-600':parseFloat(sys.percent)>50?'bg-blue-600':'bg-orange-400'}`} style={{ width: `${sys.percent}%` }}></div></div></div></td>
+                    </tr>
+                    {isExpanded && (
+                        <tr><td colSpan="5" className="p-4 bg-slate-50 border-b border-slate-200 shadow-inner"><div className="pl-6"><h4 className="text-xs font-bold text-slate-400 uppercase mb-3 flex items-center gap-2 tracking-wider"><Boxes size={14}/> Detalle por Especialidad (ABM)</h4>
+                        {Object.keys(groupedTags).sort().map(specName => (
+                            <div key={specName} className="border border-slate-200 rounded mb-2 overflow-hidden bg-white shadow-sm">
+                                <div className="p-2 px-3 bg-slate-50 border-b border-slate-100 font-bold text-slate-700 text-xs flex items-center gap-2"><Layers size={14}/> {specName}</div>
+                                <div className="overflow-x-auto"><table className="w-full text-[10px] text-left"><thead className="bg-slate-100 text-slate-500 uppercase"><tr><th className="px-4 py-2">TAG</th><th className="px-4 py-2">Desc</th><th className="px-2 py-2">Skid</th><th className="px-2 py-2">Almacen</th><th className="px-2 py-2">Calib?</th><th className="px-2 py-2">Tot</th><th className="px-2 py-2">Real</th><th className="px-2 py-2">Estado</th></tr></thead>
+                                <tbody>{groupedTags[specName].map(tagItem => <TagEditRow key={tagItem.tag} tagItem={tagItem} onEdit={onEdit} skidOptions={skidOptions} almacenOptions={almacenOptions} readOnly={readOnly}/>)}</tbody></table></div>
+                            </div>
+                        ))}
+                        </div></td></tr>
+                    )}
+                </>
+            );
+        };
+
+        // --- DASHBOARD PRINCIPAL ---
         function InstrumentDashboard() {
-            // Firebase State
+            // Firebase & Auth State
             const [fbConfig, setFbConfig] = useState(null);
             const [user, setUser] = useState(null);
             const [userRole, setUserRole] = useState('viewer');
@@ -266,14 +298,15 @@
             const [skidOptions, setSkidOptions] = useState([]);
             const [almacenOptions, setAlmacenOptions] = useState([]);
 
+            // Refs
             const fileRef = useRef(null);
             const regRef = useRef(null);
 
-            // 1. Initialization
+            // 1. Init Firebase
             useEffect(() => {
                 const cfg = localStorage.getItem('firebaseConfig');
                 const demo = localStorage.getItem('demoMode');
-                if(cfg) { try { setFbConfig(JSON.parse(cfg)); } catch(e){} }
+                if(cfg) { try { setFbConfig(JSON.parse(cfg)); } catch(e) {} }
                 else if(!demo) { /* Wait for config modal */ }
                 else { setAppState('app'); setUserRole('admin'); setMatrixData(initialSystemData); setRegData(initialRegData); }
             }, []);
@@ -283,7 +316,7 @@
                 try { const app = initializeApp(fbConfig); return { auth: getAuth(app), db: getFirestore(app) }; } catch(e) { return {auth:null, db:null}; }
             }, [fbConfig]);
 
-            // 2. Auth & Role Check
+            // 2. Auth Listener
             useEffect(() => {
                 if(auth) {
                     setAppState('login');
@@ -291,16 +324,15 @@
                         if(u) {
                             setUser(u);
                             try {
+                                // Default roles for specific emails (For immediate testing)
                                 const roleRef = doc(db, 'artifacts', appId, 'public', 'data', 'user_roles', u.email);
                                 const roleDoc = await getDoc(roleRef);
                                 if (roleDoc.exists()) {
                                     setUserRole(roleDoc.data().role);
                                 } else {
-                                    // AUTO-ASSIGN ROLES FOR SPECIFIED USERS (AS REQUESTED)
                                     let assignedRole = 'viewer';
                                     if (u.email === "jeronimo.aranda@gmail.com") assignedRole = 'admin';
                                     if (u.email === "jeronimo.aranda@pecomenergia.com.ar") assignedRole = 'viewer';
-                                    
                                     await setDoc(roleRef, { email: u.email, role: assignedRole, createdAt: new Date().toISOString() });
                                     setUserRole(assignedRole);
                                 }
@@ -314,11 +346,10 @@
             // 3. Data Sync
             useEffect(() => {
                 if(db && appState === 'app') {
-                    // Path: artifacts/{appId}/public/data/project_state/main
                     const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'project_state', 'main');
-                    return onSnapshot(docRef, (snap) => {
-                        if(snap.exists()) {
-                            const d = snap.data();
+                    return onSnapshot(docRef, (docSnap) => {
+                        if(docSnap.exists()) {
+                            const d = docSnap.data();
                             if(d.matrixData) setMatrixData(JSON.parse(d.matrixData));
                             if(d.regData) setRegData(JSON.parse(d.regData));
                             if(d.manualEdits) setManualEdits(JSON.parse(d.manualEdits));
@@ -344,11 +375,61 @@
                 setIsSyncing(false);
             };
 
+            const downloadExport = () => {
+                // Generar CSV de Matriz
+                let csvMatrix = "ESPECIALIDAD;TAG;DESC;SIS;DESC_SIS;SUBSIS;DESC_SUBSIS;SKID;ALMACEN;A CALIBRAR;PROVISION;C_TOT;C_REAL;ESTADO_1;ESTADO_2\n";
+                matrixData.forEach(d => { 
+                    const ed = manualEdits[d.tag]; 
+                    const tot = parseInt(ed?.cantRegTot !== undefined ? ed.cantRegTot : d.cantRegTot) || 0;
+                    const real = parseInt(ed?.cantRegReal !== undefined ? ed.cantRegReal : d.cantRegReal) || 0;
+                    const isComplete = (tot > 0 && real >= tot);
+                    const isInProgress = (real > 0);
+                    const finalEst2 = isComplete ? "INST" : d.estado2;
+                    const finalAlm = isInProgress ? "EN OBRA" : (ed?.almacen ?? d.almacen);
+                    csvMatrix += `${d.especialidad};${d.tag};${d.descripcion};${d.sistema};${d.descSistema};${d.subsistema};${d.descSubsistema};${ed?.skid ?? d.skid};${finalAlm};${ed?.aCalibrar ?? d.aCalibrar};${d.provision};${ed?.cantRegTot ?? d.cantRegTot};${ed?.cantRegReal ?? d.cantRegReal};${d.estado1};${finalEst2}\n`; 
+                });
+                const urlMatrix = URL.createObjectURL(new Blob([csvMatrix], {type:'text/csv'}));
+                const aMatrix = document.createElement('a'); aMatrix.href = urlMatrix; aMatrix.download = `Matriz_Avance_${new Date().toISOString().slice(0,10)}.csv`; aMatrix.click();
+
+                // Generar CSV de Registro
+                let csvReg = "TAG;SKID;UBICACION;CALIB.LABT.;FECHA CALIB.;ESTADO REGIST.;GENERADO;PRESENTADO;DEVOLUCION;UBICACIÓN DE REGISTRO;MONTADO\n";
+                regData.forEach(d => {
+                    csvReg += `${d.tag};${d.skid};${d.ubicacion};${d.lab};${d.fCalib};${d.estadoReg};${d.fGen};${d.fPres};${d.fDev};${d.ubicReg};${d.montado}\n`;
+                });
+                setTimeout(() => {
+                    const urlReg = URL.createObjectURL(new Blob([csvReg], {type:'text/csv'}));
+                    const aReg = document.createElement('a'); aReg.href = urlReg; aReg.download = `Registro_Instrumentos_${new Date().toISOString().slice(0,10)}.csv`; aReg.click();
+                }, 500);
+            };
+            
+            // ... Logic Handlers ...
+            const handleMatrixUpload = (e) => { 
+                const file = e.target.files[0]; if(!file) return; const reader = new FileReader(); 
+                reader.onload = (ev) => { 
+                     // Simplified Parsing for context length (Use V12 logic in production)
+                    const rows = ev.target.result.split('\n'); const newData = []; const del = rows[0].includes(';') ? ';' : ','; 
+                    const headers = rows[0].toUpperCase().split(del).map(h => h.trim());
+                    // ... (Use same idx logic as V22) ...
+                    const idx = { tag: headers.findIndex(h => h === 'TAG'), spec: headers.findIndex(h => h.includes('ESPECIALIDAD') || h === 'ESP'), desc: headers.findIndex(h => h.includes('DESC') && !h.includes('SIS')), sis: headers.findIndex(h => h === 'SISTEMA' || h === 'SIS'), sisDesc: headers.findIndex(h => h.includes('DESC') && h.includes('SIS')), sub: headers.findIndex(h => h.includes('SUB') && !h.includes('DESC')), subDesc: headers.findIndex(h => h.includes('DESC') && h.includes('SUB')), skid: headers.findIndex(h => h === 'SKID'), alm: headers.findIndex(h => h === 'ALMACEN' || h === 'ALM'), calib: headers.findIndex(h => h.includes('CALIBRAR')), prov: headers.findIndex(h => h.includes('PROVISION')), cTot: headers.findIndex(h => h.includes('C_TOT') || h === 'CANTREGTOT'), cReal: headers.findIndex(h => h.includes('C_REAL') || h === 'CANTREGREALIZADOS'), est1: headers.findIndex(h => h.includes('ESTADO_1')), est2: headers.findIndex(h => h.includes('ESTADO_2')) };
+                    rows.forEach((r, i) => { if (i === 0) return; const c = r.split(del); if(c[idx.tag]) newData.push({ especialidad: c[idx.spec]||"", tag: c[idx.tag], descripcion: c[idx.desc]||"", sistema: c[idx.sis]||"", descSistema: c[idx.sisDesc]||"", subsistema: c[idx.sub]||"", descSubsistema: c[idx.subDesc]||"", skid: c[idx.skid]||"", almacen: c[idx.alm]||"", aCalibrar: c[idx.calib]||"", cantRegTot: c[idx.cTot]||"0", cantRegReal: c[idx.cReal]||"0", estado1: c[idx.est1]||"", estado2: c[idx.est2]||"" }); }); 
+                    setMatrixData(newData); setManualEdits({});
+                }; reader.readAsText(file); 
+            };
+            const handleRegUpload = (e) => {
+                const file = e.target.files[0]; if(!file) return; const reader = new FileReader();
+                reader.onload = (ev) => {
+                    const rows = ev.target.result.split('\n'); const newData = []; const del = rows[0].includes(';') ? ';' : ',';
+                    const headers = rows[0].toUpperCase().split(del).map(h => h.trim());
+                    const idx = { tag: headers.findIndex(h => h === 'TAG'), skid: headers.findIndex(h => h.includes('SKID')), ubic: headers.findIndex(h => h === 'UBICACIÓN' || h.includes('UBICACION')), lab: headers.findIndex(h => h.includes('LABT')), fCalib: headers.findIndex(h => h.includes('FECHA CALIB')), estReg: headers.findIndex(h => h.includes('ESTADO REGIST')), fGen: headers.findIndex(h => h.includes('GENERADO')), fPres: headers.findIndex(h => h.includes('PRESENTADO')), fDev: headers.findIndex(h => h.includes('DEVOLUCION')), ubicReg: headers.findIndex(h => h.includes('UBICACIÓN DE REGISTRO')), montado: headers.findIndex(h => h === 'MONTADO') };
+                    rows.forEach((r, i) => { if (i === 0) return; const c = r.split(del); if(c[idx.tag]) newData.push({ tag: c[idx.tag], skid: c[idx.skid]||"", ubicacion: c[idx.ubic]||"", lab: c[idx.lab]||"", fCalib: normalizeDate(c[idx.fCalib]), estadoReg: c[idx.estReg]||"", fGen: normalizeDate(c[idx.fGen]), fPres: normalizeDate(c[idx.fPres]), fDev: normalizeDate(c[idx.fDev]), ubicReg: c[idx.ubicReg]||"", montado: c[idx.montado]||"" }); });
+                    setRegData(newData);
+                }; reader.readAsText(file);
+            };
+
             const handleTagEdit = (tag, field, value) => {
                 if(userRole !== 'admin') return;
                 setManualEdits(prev => {
                     const next = { ...prev, [tag]: { ...prev[tag], [field]: value } };
-                    // Auto-update location if regs complete
                     if (field === 'cantRegReal') {
                         const item = matrixData.find(d => d.tag === tag);
                         const tot = parseInt(next[tag].cantRegTot ?? item.cantRegTot);
@@ -359,11 +440,10 @@
             };
 
             const handleRegEdit = (tag, field, value) => {
-                if(userRole !== 'admin') return;
+                if (userRole !== 'admin') return;
                 setRegData(prev => prev.map(item => {
                     if(item.tag === tag) {
                         let newState = item.estadoDoc;
-                        // Auto-calculate logic
                         if (field === 'fDev' && value) newState = "FINALIZADO";
                         else if (field === 'fPres' && value) newState = "EN INSPECCIÓN";
                         else if (field === 'fGen' && value) newState = "EN LABORATORIO";
@@ -373,71 +453,50 @@
                 }));
             };
 
-            // Option Lists Calculation
             useEffect(() => {
                 const uniqueSkids = new Set(); const uniqueAlmacenes = new Set();
-                matrixData.forEach(item => { if(item.skid) uniqueSkids.add(item.skid); if(item.almacen) uniqueAlmacenes.add(item.almacen); });
+                matrixData.forEach(item => { if (item.skid) uniqueSkids.add(item.skid); if (item.almacen) uniqueAlmacenes.add(item.almacen); });
                 uniqueAlmacenes.add("EN OBRA");
                 setSkidOptions(Array.from(uniqueSkids).sort()); setAlmacenOptions(Array.from(uniqueAlmacenes).sort());
             }, [matrixData]);
 
-            // File Handlers (Simplified)
-            const handleFile = (e, type) => {
-                const file = e.target.files[0]; if(!file) return; const reader = new FileReader();
-                reader.onload = (ev) => {
-                    const rows = ev.target.result.split('\n'); const del = rows[0].includes(';') ? ';' : ','; const headers = rows[0].toUpperCase().split(del).map(h=>h.trim());
-                    const idx = (key) => headers.findIndex(h => h.includes(key));
-                    const data = [];
-                    rows.forEach((r,i) => {
-                        if(i===0) return; const c = r.split(del);
-                        if (type === 'matrix' && c[idx('TAG')]) {
-                            data.push({
-                                tag: c[idx('TAG')], especialidad: c[idx('ESP')]||"", sistema: c[idx('SIS')]||"", descSistema: c[idx('DESC')]||"", subsistema: c[idx('SUB')]||"", descSubsistema: c[idx('SUBS')]||"",
-                                skid: c[idx('SKID')]||"", almacen: c[idx('ALM')]||"", aCalibrar: c[idx('CALIB')]||"", cantRegTot: c[idx('TOT')]||"0", cantRegReal: c[idx('REAL')]||"0", estado2: c[idx('EST2')]||""
-                            });
-                        } else if (type === 'reg' && c[idx('TAG')]) {
-                            data.push({
-                                tag: c[idx('TAG')], skid: c[idx('SKID')]||"", ubicacion: c[idx('UBIC')]||"", lab: c[idx('LAB')]||"", fCalib: normalizeDate(c[idx('CALIB')]),
-                                estadoReg: c[idx('EST')]||"", fGen: normalizeDate(c[idx('GEN')]), fPres: normalizeDate(c[idx('PRES')]), fDev: normalizeDate(c[idx('DEV')]), montado: c[idx('MONT')]||""
-                            });
-                        }
-                    });
-                    if(type === 'matrix') { setMatrixData(data); setManualEdits({}); } else { setRegData(data); }
-                };
-                reader.readAsText(file);
-            };
-
-            // Derived Data for Render
             const calculateState = (item, edit) => {
-                const tot = parseInt(edit?.cantRegTot ?? item.cantRegTot) || 0;
-                const real = parseInt(edit?.cantRegReal ?? item.cantRegReal) || 0;
-                if(tot > 0 && real >= tot) return "INSTALADO";
-                if(real > 0) return "EN PROCESO";
+                const tot = parseInt(edit?.cantRegTot !== undefined ? edit.cantRegTot : item.cantRegTot) || 0;
+                const real = parseInt(edit?.cantRegReal !== undefined ? edit.cantRegReal : item.cantRegReal) || 0;
+                if (tot > 0 && real >= tot) return "INSTALADO";
+                if (real > 0 && real < tot) return "EN PROCESO";
                 return "PENDIENTE";
             };
 
-            const processedMatrixData = useMemo(() => {
-                return matrixData.map(d => {
-                    const ed = manualEdits[d.tag] || {};
-                    return { ...d, ...ed, calculatedStatus: calculateState(d, ed) };
-                });
-            }, [matrixData, manualEdits]);
+            const filteredMatrixData = useMemo(() => {
+                if (!hideDeleted) return matrixData;
+                return matrixData.filter(item => !(item.estado1 && item.estado1.toUpperCase().includes("ELIMINADO")));
+            }, [matrixData, hideDeleted]);
 
             const systemsStats = useMemo(() => {
                 const grouped = {};
-                processedMatrixData.forEach(item => {
-                    if(item.estado1?.includes("ELIMINADO")) return;
+                filteredMatrixData.forEach(item => {
+                    const tag = item.tag?.trim();
+                    const edit = manualEdits[tag];
+                    const state = calculateState(item, edit);
+                    const isMounted = state === "INSTALADO";
+                    const isInProgress = state === "EN PROCESO";
                     const key = `${item.sistema}|${item.subsistema}`;
-                    if(!grouped[key]) grouped[key] = { id: key, sistema: item.sistema, descSistema: item.descSistema, subsistema: item.subsistema, descSubsistema: item.descSubsistema, totalTags: 0, mountedTags: 0, tags: [] };
+                    if (!grouped[key]) grouped[key] = { id: key, sistema: item.sistema, descSistema: item.descSistema, subsistema: item.subsistema, descSubsistema: item.descSubsistema, totalTags: 0, mountedTags: 0, tags: [] };
                     grouped[key].totalTags++;
-                    if(item.calculatedStatus === 'INSTALADO') grouped[key].mountedTags++;
-                    grouped[key].tags.push(item);
+                    if (isMounted) grouped[key].mountedTags++;
+                    const displayAlmacen = ((isMounted || isInProgress) && (!edit?.almacen && !item.almacen)) ? "EN OBRA" : (edit?.almacen !== undefined ? edit.almacen : item.almacen);
+                    grouped[key].tags.push({ 
+                        tag, desc: item.descripcion, specialty: item.especialidad, mounted: isMounted, calculatedStatus: state,
+                        skid: edit?.skid !== undefined ? edit.skid : item.skid,
+                        almacen: displayAlmacen, 
+                        aCalibrar: edit?.aCalibrar !== undefined ? edit.aCalibrar : item.aCalibrar,
+                        cantRegTot: edit?.cantRegTot !== undefined ? edit.cantRegTot : item.cantRegTot,
+                        cantRegReal: edit?.cantRegReal !== undefined ? edit.cantRegReal : item.cantRegReal
+                    });
                 });
                 return Object.values(grouped).map(g => ({...g, percent: g.totalTags>0 ? ((g.mountedTags/g.totalTags)*100).toFixed(0) : 0}));
-            }, [processedMatrixData]);
-
-            // Calculated startedSubsystems here to avoid reference error
-            const startedSubsystems = useMemo(() => systemsStats.filter(s => s.mountedTags > 0).length, [systemsStats]);
+            }, [filteredMatrixData, manualEdits]);
 
             const flatRegData = useMemo(() => {
                 return regData.map(item => {
@@ -450,8 +509,25 @@
             
             const filteredRegList = filter === "TODOS" ? flatRegData : flatRegData.filter(d => d.estadoDoc === filter || d.ubicacion === filter);
 
-            // RENDER
-            if(!fbConfig && !localStorage.getItem('demoMode')) return <FirebaseConfigModal onSave={setFbConfig} />;
+            // Metrics
+            const startedSubsystems = useMemo(() => systemsStats.filter(s => s.mountedTags > 0).length, [systemsStats]);
+            const globalProgress = useMemo(() => {
+                let sumTot = 0; let sumReal = 0;
+                filteredMatrixData.forEach(item => {
+                    const edit = manualEdits[item.tag?.trim()];
+                    const valTot = parseInt(edit?.cantRegTot ?? item.cantRegTot) || 0;
+                    const valReal = parseInt(edit?.cantRegReal ?? item.cantRegReal) || 0;
+                    sumTot += valTot; sumReal += valReal;
+                });
+                return sumTot === 0 ? "0.0" : ((sumReal / sumTot) * 100).toFixed(1);
+            }, [filteredMatrixData, manualEdits]);
+
+            const docStatusCounts = useMemo(() => { const c = flatRegData.reduce((acc, curr) => { acc[curr.estadoDoc] = (acc[curr.estadoDoc] || 0) + 1; return acc; }, {}); return Object.keys(c).map(k => ({ name: k, value: c[k] })); }, [flatRegData]);
+            const physStatusCounts = useMemo(() => { const c = flatRegData.reduce((acc, curr) => { acc[curr.ubicacion] = (acc[curr.ubicacion] || 0) + 1; return acc; }, {}); return Object.keys(c).map(k => ({ name: k, value: c[k] })); }, [flatRegData]);
+            const labCounts = useMemo(() => { const c = flatRegData.reduce((acc, curr) => { const l = curr.proveedor || "-"; acc[l] = (acc[l] || 0) + 1; return acc; }, {}); return Object.keys(c).map(k => ({ name: k, value: c[k] })); }, [flatRegData]);
+
+            // Render Views
+            if(!fbConfig && !localStorage.getItem('demoMode')) return <FirebaseConfigModal onSave={(cfg) => { setFbConfig(cfg); }} />;
             if(appState === 'login') return <Login auth={auth} onLogin={()=>{}} />;
 
             return (
@@ -460,15 +536,17 @@
                     
                     <div className="flex flex-col gap-4 mb-6">
                         <div className="flex flex-col xl:flex-row justify-between items-center bg-white p-6 rounded-lg shadow-sm border border-slate-200">
-                            <div><h1 className="text-3xl font-bold text-slate-800">Seguimiento de Obra {userRole==='viewer' && <span className="text-xs bg-gray-100 px-2 py-1 rounded">Solo Lectura</span>}</h1></div>
-                            <div className="flex gap-2">
+                            <div><h1 className="text-3xl font-bold text-slate-800 flex items-center gap-3">Seguimiento de Obra {isSyncing && <RefreshCw className="animate-spin text-blue-500" size={16}/>} {userRole === 'viewer' && <span className="text-xs bg-gray-100 text-gray-800 px-2 py-1 rounded-full flex items-center gap-1"><Eye size={12}/> Solo Lectura</span>}</h1><p className="text-slate-500">Gestión Unificada de Matriz y Avance</p></div>
+                            <div className="flex gap-2 mt-4 xl:mt-0">
                                 {userRole === 'admin' && (<>
-                                    <button onClick={saveToCloud} disabled={isSyncing} className="bg-indigo-600 text-white px-4 py-2 rounded text-sm">{isSyncing?"...":"Sincronizar"}</button>
-                                    <input type="file" ref={fileRef} onChange={(e)=>handleFile(e,'matrix')} className="hidden" /><button onClick={()=>fileRef.current.click()} className="bg-purple-600 text-white px-4 py-2 rounded text-sm">Matriz</button>
-                                    <input type="file" ref={regRef} onChange={(e)=>handleFile(e,'reg')} className="hidden" /><button onClick={()=>regRef.current.click()} className="bg-blue-600 text-white px-4 py-2 rounded text-sm">Registro</button>
-                                    <button onClick={()=>setIsUserModalOpen(true)} className="p-2 bg-slate-100 rounded-full"><Settings size={20}/></button>
+                                    <button onClick={() => setHideDeleted(!hideDeleted)} className={`flex items-center gap-2 px-4 py-2 rounded text-sm border font-medium transition-colors ${hideDeleted ? 'bg-blue-100 text-blue-700 border-blue-300' : 'bg-gray-100 text-gray-500 border-gray-300'}`}>{hideDeleted ? <EyeOff size={16}/> : <Eye size={16}/>} {hideDeleted ? "Ocultando Eliminados" : "Ver Eliminados"}</button>
+                                    <button onClick={saveToCloud} disabled={isSyncing} className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded text-sm transition-colors">{isSyncing ? "Guardando..." : "Sincronizar Nube"}</button>
+                                    <button onClick={downloadExport} className="flex items-center gap-2 bg-white border border-slate-300 text-slate-700 px-4 py-2 rounded text-sm hover:bg-slate-50"><Save size={16}/> Guardar Todo (CSVs)</button>
+                                    <input type="file" ref={fileRef} onChange={handleMatrixUpload} accept=".csv" className="hidden" /><button onClick={() => fileRef.current.click()} className="flex items-center gap-2 bg-purple-600 text-white px-4 py-2 rounded text-sm hover:bg-purple-700"><Upload size={16}/> Matriz</button>
+                                    <input type="file" ref={regRef} onChange={handleRegUpload} accept=".csv" className="hidden" /><button onClick={() => regRef.current.click()} className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded text-sm hover:bg-blue-700"><Upload size={16}/> Registro</button>
+                                    <button onClick={() => setIsUserModalOpen(true)} className="p-2 bg-slate-100 hover:bg-slate-200 rounded-full text-slate-600"><Settings size={20}/></button>
                                 </>)}
-                                {user && <button onClick={()=>signOut(auth)} className="p-2 text-red-500 rounded-full"><LogOut/></button>}
+                                {user && <div className="flex items-center gap-3 ml-4 pl-4 border-l border-slate-200"><div className="text-right"><p className="text-xs font-bold text-slate-700">{user.email}</p><p className="text-[10px] text-slate-400 uppercase">{userRole}</p></div><button onClick={() => signOut(auth)} className="p-2 text-red-500 hover:bg-red-50 rounded-full"><LogOut size={18}/></button></div>}
                             </div>
                         </div>
                         <div className="flex gap-6 border-b border-slate-200 px-4">
@@ -479,20 +557,24 @@
 
                     {activeTab === 'dashboard' && (
                         <div className="animate-enter">
+                            <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
+                                <MetricCard title="Total Registros" value={flatRegData.length} percentage="100" icon={Activity} color="#6366f1" />
+                                <MetricCard title="Finalizados" value={flatRegData.filter(d => d.estadoDoc === "FINALIZADO").length} percentage={flatRegData.length > 0 ? ((flatRegData.filter(d => d.estadoDoc === "FINALIZADO").length / flatRegData.length) * 100).toFixed(0) : 0} icon={CheckCircle} color="#15803d" />
+                                <MetricCard title="En Obra" value={flatRegData.filter(d => d.ubicacion === "EN OBRA").length} icon={Truck} color="#eab308" />
+                                <MetricCard title="Laboratorio" value={flatRegData.filter(d => d.estadoDoc === "EN LABORATORIO").length} icon={Wrench} color="#f97316" />
+                            </div>
+
+                            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
+                                <div className="bg-white p-6 rounded-lg shadow border border-slate-100 h-64"><h3 className="text-sm font-bold text-slate-700 mb-4">Estado Documental</h3><ResponsiveContainer width="100%" height="100%"><BarChart data={docStatusCounts} layout="vertical"><CartesianGrid strokeDasharray="3 3"/><XAxis type="number"/><YAxis dataKey="name" type="category" width={90} tick={{fontSize:10}}/><Tooltip/><Bar dataKey="value" fill="#3b82f6"/></BarChart></ResponsiveContainer></div>
+                                <div className="bg-white p-6 rounded-lg shadow border border-slate-100 h-64"><h3 className="text-sm font-bold text-slate-700 mb-4">Ubicación Física</h3><ResponsiveContainer width="100%" height="100%"><PieChart><Pie data={physStatusCounts} dataKey="value" cx="50%" cy="50%" outerRadius={60} fill="#8884d8" label>{physStatusCounts.map((e,i)=><Cell key={i} fill={Object.values(COLORS)[i%8]}/>)}</Pie><Tooltip/><Legend/></PieChart></ResponsiveContainer></div>
+                                <div className="bg-white p-6 rounded-lg shadow border border-slate-100 h-64"><h3 className="text-sm font-bold text-slate-700 mb-4">Laboratorios</h3><ResponsiveContainer width="100%" height="100%"><PieChart><Pie data={labCounts} dataKey="value" cx="50%" cy="50%" outerRadius={60} fill="#82ca9d" label>{labCounts.map((e,i)=><Cell key={i} fill={Object.values(COLORS)[(i+2)%8]}/>)}</Pie><Tooltip/><Legend/></PieChart></ResponsiveContainer></div>
+                            </div>
+
                              <div className="bg-white rounded-lg shadow overflow-hidden border border-slate-200 mt-6">
                                 <div className="p-4 border-b flex justify-between items-center"><h3 className="font-bold">Listado de Registros (ABM)</h3><select className="select-edit w-48" value={filter} onChange={e=>setFilter(e.target.value)}><option value="TODOS">Todos</option><option value="FINALIZADO">Finalizados</option></select></div>
                                 <div className="overflow-x-auto max-h-[600px]"><table className="w-full text-sm text-left"><thead className="bg-slate-100"><tr><th>TAG</th><th>Lab</th><th>Gen</th><th>Pres</th><th>Dev</th><th>Est</th><th>Ubic</th><th>Montado</th></tr></thead><tbody>
                                     {filteredRegList.map((row, i) => (
-                                        <tr key={i} className="border-b">
-                                            <td className="px-4 py-1">{row.tag}</td>
-                                            <td><select disabled={userRole!=='admin'} className="select-edit" value={row.proveedor} onChange={e=>handleRegEdit(row.tag,'lab',e.target.value)}><option value="">-</option><option value="Pecom">Pecom</option><option value="CIS">CIS</option></select></td>
-                                            <td><input disabled={userRole!=='admin'} type="date" className="input-edit" value={row.fechaGen} onChange={e=>handleRegEdit(row.tag,'fGen',e.target.value)}/></td>
-                                            <td><input disabled={userRole!=='admin'} type="date" className="input-edit" value={row.fechaPres} onChange={e=>handleRegEdit(row.tag,'fPres',e.target.value)}/></td>
-                                            <td><input disabled={userRole!=='admin'} type="date" className="input-edit" value={row.fechaDev} onChange={e=>handleRegEdit(row.tag,'fDev',e.target.value)}/></td>
-                                            <td>{row.estadoDoc}</td>
-                                            <td>{row.ubicacion}</td>
-                                            <td><select disabled={userRole!=='admin'} className="select-edit" value={row.montado} onChange={e=>handleRegEdit(row.tag,'montado',e.target.value)}><option value="SIN MONTAR">SIN MONTAR</option><option value="MONTADO">MONTADO</option></select></td>
-                                        </tr>
+                                        <RegEditRow key={i} row={row} onEdit={handleRegEdit} readOnly={userRole!=='admin'}/>
                                     ))}
                                 </tbody></table></div>
                             </div>
@@ -500,18 +582,38 @@
                     )}
 
                     {activeTab === 'systems' && (
-                        <div className="grid grid-cols-1 gap-6 animate-enter">
-                            <div className="bg-white p-4 rounded-lg shadow"><h3 className="font-bold">Iniciados: {startedSubsystems}</h3></div>
-                            {systemsStats.map((sys, i) => (
-                                <div key={i} className="bg-white rounded shadow p-4 mb-2">
-                                    <div className="flex justify-between font-bold" onClick={()=>toggleRow(sys.id)}><span>{sys.sistema}</span><span>{sys.percent}%</span></div>
-                                    {expandedRows[sys.id] && (
-                                        <table className="w-full text-xs mt-2"><thead><tr><th>Tag</th><th>Skid</th><th>Alm</th><th>Reg</th><th>Est</th></tr></thead>
-                                            <tbody>{sys.tags.map((t, j) => <TagEditRow key={j} tagItem={t} onEdit={handleTagEdit} skidOptions={skidOptions} almacenOptions={almacenOptions} readOnly={userRole!=='admin'}/>)}</tbody>
-                                        </table>
-                                    )}
+                        <div className="animate-enter">
+                            <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
+                                <div className="bg-white p-4 rounded-lg shadow border-l-4 border-purple-500"><h3 className="text-xs font-bold text-gray-500 uppercase">Subsistemas</h3><p className="text-2xl font-bold text-gray-800">{systemsStats.length}</p></div>
+                                <div className="bg-white p-4 rounded-lg shadow border-l-4 border-orange-500"><h3 className="text-xs font-bold text-gray-500 uppercase">Iniciados</h3><p className="text-2xl font-bold text-gray-800">{startedSubsystems}</p></div>
+                                <div className="bg-white p-4 rounded-lg shadow border-l-4 border-blue-500"><h3 className="text-xs font-bold text-gray-500 uppercase">Total Tags</h3><p className="text-2xl font-bold text-gray-800">{filteredMatrixData.length}</p></div>
+                                <div className="bg-white p-4 rounded-lg shadow border-l-4 border-green-600"><h3 className="text-xs font-bold text-gray-500 uppercase">Avance Global</h3><p className="text-2xl font-bold text-gray-800">{globalProgress}%</p></div>
+                            </div>
+
+                            <div className="bg-white rounded-lg shadow overflow-hidden mt-6">
+                                <div className="p-4 border-b bg-slate-50 font-bold text-slate-700">Matriz de Sistemas (Edición en Vivo)</div>
+                                <div className="overflow-x-auto">
+                                    <table className="w-full text-sm text-left">
+                                        <thead className="text-xs uppercase bg-slate-100 text-slate-600">
+                                            <tr><th className="p-3">Sistema</th><th className="p-3">Subsistema</th><th className="p-3 text-center">Total</th><th className="p-3 text-center">Instalado</th><th className="p-3">Avance</th></tr>
+                                        </thead>
+                                        <tbody className="divide-y divide-slate-100">
+                                            {systemsStats.map((sys, i) => (
+                                                <ExpandableRow 
+                                                    key={i} 
+                                                    sys={sys} 
+                                                    isExpanded={expandedRows[sys.id]} 
+                                                    onToggle={() => toggleRow(sys.id)} 
+                                                    onEdit={handleTagEdit} 
+                                                    skidOptions={skidOptions} 
+                                                    almacenOptions={almacenOptions} 
+                                                    readOnly={userRole !== 'admin'}
+                                                />
+                                            ))}
+                                        </tbody>
+                                    </table>
                                 </div>
-                            ))}
+                            </div>
                         </div>
                     )}
                 </div>
