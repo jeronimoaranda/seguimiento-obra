@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Tablero de Instrumentación - Cloud & Multi-Usuario</title>
+    <title>Tablero de Instrumentación - Batería de Petróleo</title>
     
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
@@ -44,6 +44,7 @@
         .select-edit:disabled { background-color: #f1f5f9; color: #94a3b8; cursor: not-allowed; }
         
         /* Estilo específico para input date */
+        input[type="date"] { cursor: pointer; }
         input[type="date"]::-webkit-calendar-picker-indicator { cursor: pointer; opacity: 0.6; }
         input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; }
 
@@ -86,18 +87,52 @@
         };
 
         // --- COMPONENTES UI AUXILIARES ---
-        const Modal = ({ isOpen, onClose, title, children, icon: Icon, color = "text-blue-600" }) => {
+        const ConfirmModal = ({ isOpen, onClose, onConfirm, title, message }) => {
             if (!isOpen) return null;
             return (
-                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[70] p-4 backdrop-blur-sm">
-                    <div className="bg-white rounded-xl shadow-2xl max-w-md w-full p-6 animate-enter border border-slate-100">
-                        <div className={`flex items-center gap-3 mb-4 ${color}`}>
-                            {Icon && <Icon size={24} />}
-                            <h3 className="text-lg font-bold text-slate-800">{title}</h3>
+                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[60] p-4">
+                    <div className="bg-white rounded-lg shadow-xl max-w-sm w-full p-6">
+                        <div className="flex items-center gap-3 mb-4 text-red-600"><AlertTriangle size={24} /><h3 className="text-lg font-bold">{title || "¿Limpiar Todo?"}</h3></div>
+                        <p className="text-gray-600 mb-6 text-sm">{message || "Se perderán todos los datos cargados."}</p>
+                        <div className="flex justify-end gap-3">
+                            <button onClick={onClose} className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded text-sm">Cancelar</button>
+                            <button onClick={onConfirm} className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded text-sm">Aceptar</button>
                         </div>
-                        <div className="text-slate-600 text-sm">{children}</div>
-                        <div className="mt-6 flex justify-end gap-3">
-                            <button onClick={onClose} className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-sm font-medium transition-colors">Cerrar</button>
+                    </div>
+                </div>
+            );
+        };
+
+        const SuccessModal = ({ isOpen, onClose, message }) => {
+            if (!isOpen) return null;
+            return (
+                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[60] p-4">
+                    <div className="bg-white rounded-lg shadow-xl max-w-sm w-full p-6 animate-enter">
+                        <div className="flex items-center gap-3 mb-4 text-green-600"><FileCheck size={24} /><h3 className="text-lg font-bold">Carga Exitosa</h3></div>
+                        <p className="text-gray-600 mb-6 text-sm">{message}</p>
+                        <div className="flex justify-end gap-3">
+                            <button onClick={onClose} className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded text-sm">Aceptar</button>
+                        </div>
+                    </div>
+                </div>
+            );
+        };
+        
+        const ApprovalModal = ({ isOpen, onClose, onConfirm, changes }) => {
+            if (!isOpen || !changes) return null;
+            return (
+                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[60] p-4">
+                    <div className="bg-white rounded-lg shadow-xl max-w-md w-full p-6 animate-enter">
+                        <div className="flex items-center gap-3 mb-4 text-blue-600"><RefreshCw size={24} /><h3 className="text-lg font-bold">Confirmar Actualización</h3></div>
+                        <p className="text-gray-600 mb-4 text-sm">Se ha analizado el archivo. Resumen de cambios:</p>
+                        <div className="bg-slate-50 p-4 rounded border border-slate-200 mb-6 text-sm">
+                            <div className="flex justify-between mb-2"><span>Total Registros:</span> <strong>{changes.total}</strong></div>
+                            <div className="flex justify-between mb-2 text-green-600"><span>Nuevos:</span> <strong>+{changes.newItems}</strong></div>
+                            <div className="flex justify-between text-orange-600"><span>Modificados:</span> <strong>~{changes.modified}</strong></div>
+                        </div>
+                        <div className="flex justify-end gap-3">
+                            <button onClick={onClose} className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded text-sm">Cancelar</button>
+                            <button onClick={onConfirm} className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded text-sm flex items-center gap-2"><FileCheck size={16}/> Aprobar Carga</button>
                         </div>
                     </div>
                 </div>
@@ -131,9 +166,7 @@
             );
         };
 
-        // --- COMPONENTES DE ESTRUCTURA ---
-        
-        // 1. CONFIGURACIÓN FIREBASE (MODAL INICIAL)
+        // --- COMPONENTES DE CONFIGURACIÓN ---
         const FirebaseConfigModal = ({ onSave }) => {
             const [configStr, setConfigStr] = useState('');
             const [error, setError] = useState('');
@@ -154,39 +187,24 @@
                     localStorage.setItem('firebaseConfig', JSON.stringify(config));
                     onSave(config);
                 } catch (e) {
-                    setError("JSON inválido. Asegúrate de copiar todo el objeto de configuración de Firebase.");
+                    setError("JSON inválido.");
                 }
             };
 
             return (
                 <div className="fixed inset-0 bg-slate-900 flex items-center justify-center z-[100] p-4">
                     <div className="bg-white rounded-xl shadow-2xl max-w-lg w-full p-8 animate-enter">
-                        <div className="flex items-center gap-3 mb-4 text-orange-600">
-                            <Settings size={32} />
-                            <h2 className="text-2xl font-bold text-slate-800">Configuración Inicial</h2>
-                        </div>
-                        <p className="text-slate-600 mb-4 text-sm">
-                            Para activar el almacenamiento en la nube y el sistema de usuarios, pega aquí tu configuración de Firebase (JSON).
-                        </p>
-                        <textarea 
-                            className="w-full h-40 p-3 border border-slate-300 rounded-lg font-mono text-xs mb-2 focus:ring-2 focus:ring-orange-500 outline-none"
-                            placeholder='{ "apiKey": "...", "authDomain": "...", ... }'
-                            value={configStr}
-                            onChange={(e) => setConfigStr(e.target.value)}
-                        />
+                        <div className="flex items-center gap-3 mb-4 text-orange-600"><Settings size={32} /><h2 className="text-2xl font-bold text-slate-800">Configuración Inicial</h2></div>
+                        <p className="text-slate-600 mb-4 text-sm">Pega aquí tu configuración de Firebase (JSON).</p>
+                        <textarea className="w-full h-40 p-3 border border-slate-300 rounded-lg font-mono text-xs mb-2 focus:ring-2 focus:ring-orange-500 outline-none" placeholder='{ "apiKey": "...", ... }' value={configStr} onChange={(e) => setConfigStr(e.target.value)}/>
                         {error && <p className="text-red-500 text-xs mb-4">{error}</p>}
-                        <button onClick={handleSave} className="w-full py-3 bg-orange-600 hover:bg-orange-700 text-white rounded-lg font-bold transition-colors">
-                            Conectar Sistema
-                        </button>
-                        <div className="mt-4 text-center">
-                            <a href="#" onClick={(e) => {e.preventDefault(); localStorage.setItem('demoMode', 'true'); window.location.reload()}} className="text-xs text-slate-400 hover:text-slate-600 underline">Continuar en Modo Demo (Solo Local)</a>
-                        </div>
+                        <button onClick={handleSave} className="w-full py-3 bg-orange-600 hover:bg-orange-700 text-white rounded-lg font-bold transition-colors">Conectar Sistema</button>
+                        <div className="mt-4 text-center"><a href="#" onClick={(e) => {e.preventDefault(); localStorage.setItem('demoMode', 'true'); window.location.reload()}} className="text-xs text-slate-400 hover:text-slate-600 underline">Continuar en Modo Demo (Solo Local)</a></div>
                     </div>
                 </div>
             );
         };
 
-        // 2. LOGIN
         const Login = ({ auth, onLoginSuccess }) => {
             const [email, setEmail] = useState('');
             const [password, setPassword] = useState('');
@@ -200,7 +218,7 @@
                 try {
                     await signInWithEmailAndPassword(auth, email, password);
                 } catch (err) {
-                    setError("Error de autenticación. Verifica tus credenciales o conexión.");
+                    setError("Error de autenticación.");
                 } finally {
                     setLoading(false);
                 }
@@ -209,33 +227,19 @@
             return (
                 <div className="fixed inset-0 bg-slate-50 flex items-center justify-center z-[90]">
                     <div className="bg-white p-8 rounded-xl shadow-xl w-full max-w-sm border border-slate-100 animate-enter">
-                        <div className="flex justify-center mb-6">
-                            <div className="p-4 bg-blue-100 rounded-full text-blue-600"><Lock size={32}/></div>
-                        </div>
+                        <div className="flex justify-center mb-6"><div className="p-4 bg-blue-100 rounded-full text-blue-600"><Lock size={32}/></div></div>
                         <h2 className="text-2xl font-bold text-center text-slate-800 mb-2">Acceso Seguro</h2>
-                        <p className="text-center text-slate-500 text-sm mb-6">Tablero de Control de Instrumentación</p>
-                        
                         <form onSubmit={handleLogin} className="space-y-4">
-                            <div>
-                                <label className="block text-xs font-medium text-slate-700 mb-1">Usuario / Email</label>
-                                <input type="email" required className="w-full p-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" value={email} onChange={(e) => setEmail(e.target.value)} />
-                            </div>
-                            <div>
-                                <label className="block text-xs font-medium text-slate-700 mb-1">Contraseña</label>
-                                <input type="password" required className="w-full p-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" value={password} onChange={(e) => setPassword(e.target.value)} />
-                            </div>
+                            <div><label className="block text-xs font-medium text-slate-700 mb-1">Usuario</label><input type="email" required className="w-full p-2 border border-slate-300 rounded-lg outline-none" value={email} onChange={(e) => setEmail(e.target.value)} /></div>
+                            <div><label className="block text-xs font-medium text-slate-700 mb-1">Contraseña</label><input type="password" required className="w-full p-2 border border-slate-300 rounded-lg outline-none" value={password} onChange={(e) => setPassword(e.target.value)} /></div>
                             {error && <p className="text-red-500 text-xs">{error}</p>}
-                            <button type="submit" disabled={loading} className="w-full py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-colors flex justify-center items-center gap-2">
-                                {loading ? <RefreshCw className="animate-spin" size={18}/> : "Ingresar"}
-                            </button>
+                            <button type="submit" disabled={loading} className="w-full py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-colors flex justify-center items-center gap-2">{loading ? <RefreshCw className="animate-spin" size={18}/> : "Ingresar"}</button>
                         </form>
-                        <p className="mt-4 text-xs text-center text-slate-400">Sistema seguro conectado a Firebase</p>
                     </div>
                 </div>
             );
         };
 
-        // 3. GESTIÓN DE USUARIOS (MODAL)
         const UserManagement = ({ isOpen, onClose, db, currentUserEmail }) => {
             const [users, setUsers] = useState([]);
             const [newUserEmail, setNewUserEmail] = useState('');
@@ -243,9 +247,7 @@
             const [loading, setLoading] = useState(false);
             const [msg, setMsg] = useState('');
 
-            const rolesCollection = useMemo(() => {
-                return db ? collection(db, 'artifacts', appId, 'public', 'data', 'user_roles') : null;
-            }, [db]);
+            const rolesCollection = useMemo(() => db ? collection(db, 'artifacts', appId, 'public', 'data', 'user_roles') : null, [db]);
 
             useEffect(() => {
                 if(isOpen && rolesCollection) {
@@ -253,9 +255,7 @@
                         try {
                             const snap = await getDocs(rolesCollection);
                             setUsers(snap.docs.map(d => ({id: d.id, ...d.data()})));
-                        } catch (e) {
-                            console.error("Error fetching users:", e);
-                        }
+                        } catch (e) { console.error(e); }
                     };
                     fetchUsers();
                 }
@@ -265,19 +265,12 @@
                 if(!newUserEmail || !rolesCollection) return;
                 setLoading(true);
                 try {
-                    await setDoc(doc(rolesCollection, newUserEmail), {
-                        email: newUserEmail,
-                        role: newUserRole,
-                        createdBy: currentUserEmail,
-                        createdAt: new Date().toISOString()
-                    });
+                    await setDoc(doc(rolesCollection, newUserEmail), { email: newUserEmail, role: newUserRole, createdBy: currentUserEmail, createdAt: new Date().toISOString() });
                     setMsg("Rol asignado correctamente.");
                     const snap = await getDocs(rolesCollection);
                     setUsers(snap.docs.map(d => ({id: d.id, ...d.data()})));
                     setNewUserEmail('');
-                } catch (e) {
-                    setMsg("Error: " + e.message);
-                }
+                } catch (e) { setMsg("Error: " + e.message); }
                 setLoading(false);
             };
 
@@ -286,41 +279,21 @@
             return (
                 <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[80] p-4 backdrop-blur-sm">
                     <div className="bg-white rounded-xl shadow-2xl max-w-2xl w-full p-6 animate-enter">
-                        <div className="flex justify-between items-center mb-6">
-                            <div className="flex items-center gap-3 text-purple-600">
-                                <Shield size={24} />
-                                <h3 className="text-lg font-bold">Gestión de Usuarios y Permisos</h3>
-                            </div>
-                            <button onClick={onClose}><X size={20} className="text-slate-400 hover:text-slate-600"/></button>
-                        </div>
-                        
+                        <div className="flex justify-between items-center mb-6"><div className="flex items-center gap-3 text-purple-600"><Shield size={24} /><h3 className="text-lg font-bold">Gestión de Usuarios</h3></div><button onClick={onClose}><X size={20} className="text-slate-400 hover:text-slate-600"/></button></div>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                             <div className="border-r border-slate-100 pr-6">
                                 <h4 className="font-medium text-slate-700 mb-3 text-sm">Registrar Nuevo Acceso</h4>
                                 <div className="space-y-3">
-                                    <input type="email" placeholder="Correo electrónico" className="input-edit" value={newUserEmail} onChange={e=>setNewUserEmail(e.target.value)}/>
-                                    <select className="select-edit" value={newUserRole} onChange={e=>setNewUserRole(e.target.value)}>
-                                        <option value="viewer">Visualizador (Solo lectura)</option>
-                                        <option value="admin">Administrador (Edición total)</option>
-                                    </select>
-                                    <p className="text-[10px] text-slate-400">Nota: Esto solo asigna el rol en el sistema. El usuario debe poder autenticarse en Firebase.</p>
-                                    <button onClick={handleCreateUser} disabled={loading} className="w-full py-2 bg-purple-600 hover:bg-purple-700 text-white rounded text-sm font-medium transition-colors">Asignar Rol</button>
+                                    <input type="email" placeholder="Correo" className="input-edit" value={newUserEmail} onChange={e=>setNewUserEmail(e.target.value)}/>
+                                    <select className="select-edit" value={newUserRole} onChange={e=>setNewUserRole(e.target.value)}><option value="viewer">Visualizador</option><option value="admin">Administrador</option></select>
+                                    <button onClick={handleCreateUser} disabled={loading} className="w-full py-2 bg-purple-600 hover:bg-purple-700 text-white rounded text-sm font-medium">Asignar Rol</button>
                                     {msg && <p className="text-xs text-green-600 mt-2">{msg}</p>}
                                 </div>
                             </div>
                             <div>
                                 <h4 className="font-medium text-slate-700 mb-3 text-sm">Usuarios Activos</h4>
                                 <div className="max-h-60 overflow-y-auto space-y-2">
-                                    {users.map(u => (
-                                        <div key={u.id} className="p-2 border border-slate-100 rounded bg-slate-50 flex justify-between items-center">
-                                            <div>
-                                                <p className="text-xs font-bold text-slate-700">{u.id}</p>
-                                                <p className="text-[10px] text-slate-500 uppercase">{u.role}</p>
-                                            </div>
-                                            <div className={`w-2 h-2 rounded-full ${u.role==='admin'?'bg-red-500':'bg-green-500'}`}></div>
-                                        </div>
-                                    ))}
-                                    {users.length === 0 && <p className="text-xs text-slate-400">No hay usuarios registrados.</p>}
+                                    {users.map(u => (<div key={u.id} className="p-2 border border-slate-100 rounded bg-slate-50 flex justify-between items-center"><div><p className="text-xs font-bold text-slate-700">{u.id}</p><p className="text-[10px] text-slate-500 uppercase">{u.role}</p></div><div className={`w-2 h-2 rounded-full ${u.role==='admin'?'bg-red-500':'bg-green-500'}`}></div></div>))}
                                 </div>
                             </div>
                         </div>
@@ -329,13 +302,11 @@
             );
         };
 
-        // --- COMPONENTES CORE DEL DASHBOARD ---
-
+        // --- COMPONENTES CORE ---
         const TagEditRow = ({ tagItem, onEdit, skidOptions, almacenOptions, readOnly }) => {
             let rowColor = "hover:bg-slate-50";
             if (tagItem.calculatedStatus === "INSTALADO") rowColor = "bg-green-50/60";
             else if (tagItem.calculatedStatus === "EN PROCESO") rowColor = "bg-yellow-50/60";
-
             return (
                 <tr className={`border-b border-slate-100 transition-colors ${rowColor}`}>
                     <td className="px-4 py-2 font-medium text-slate-800 w-32">{tagItem.tag}</td>
@@ -356,7 +327,6 @@
                 sys.tags.forEach(t => { const spec = t.specialty || "Sin Especialidad"; if (!groups[spec]) groups[spec] = []; groups[spec].push(t); });
                 return groups;
             }, [sys.tags]);
-
             return (
                 <>
                     <tr className={`bg-white hover:bg-blue-50 transition-colors border-b border-slate-100 cursor-pointer ${isExpanded ? 'bg-slate-50 border-l-4 border-l-blue-500' : ''}`} onClick={onToggle}>
@@ -383,107 +353,77 @@
 
         // --- DASHBOARD PRINCIPAL ---
         function InstrumentDashboard() {
-            // Firebase & Auth State
+            // STATE
             const [fbConfig, setFbConfig] = useState(null);
             const [user, setUser] = useState(null);
             const [userRole, setUserRole] = useState('viewer');
-            const [appState, setAppState] = useState('init'); // init, login, app
-
-            // Data State
+            const [appState, setAppState] = useState('init');
             const [matrixData, setMatrixData] = useState([]);
             const [regData, setRegData] = useState([]);
             const [manualEdits, setManualEdits] = useState({});
-            
-            // UI State
             const [activeTab, setActiveTab] = useState("dashboard");
             const [filter, setFilter] = useState("TODOS");
             const [isSyncing, setIsSyncing] = useState(false);
             const [expandedRows, setExpandedRows] = useState({});
             const [isUserModalOpen, setIsUserModalOpen] = useState(false);
             const [hideDeleted, setHideDeleted] = useState(true);
-            const [isLoadingCloud, setIsLoadingCloud] = useState(false);
-
-            // Refs
-            const fileRef = useRef(null);
-            const regRef = useRef(null);
             const [skidOptions, setSkidOptions] = useState([]);
             const [almacenOptions, setAlmacenOptions] = useState([]);
 
-            // 1. Init Firebase
+            // REFS
+            const fileRef = useRef(null);
+            const regRef = useRef(null);
+
+            // INIT
             useEffect(() => {
                 const cfg = localStorage.getItem('firebaseConfig');
                 const demo = localStorage.getItem('demoMode');
-                if(cfg) {
-                    try {
-                        setFbConfig(JSON.parse(cfg));
-                    } catch(e) { console.error("Bad config in localstorage"); }
-                } else if (!demo) {
-                    // Stay in init
-                } else {
-                    setAppState('app'); setUserRole('admin'); 
-                }
+                if(cfg) { try { setFbConfig(JSON.parse(cfg)); } catch(e) {} } 
+                else if (!demo) { /* Wait config */ } 
+                else { setAppState('app'); setUserRole('admin'); }
             }, []);
 
             const { auth, db } = useMemo(() => {
                 if(!fbConfig) return {auth:null, db:null};
-                try {
-                    const app = initializeApp(fbConfig);
-                    return { auth: getAuth(app), db: getFirestore(app) };
-                } catch(e) { console.error(e); return {auth:null, db:null}; }
+                try { const app = initializeApp(fbConfig); return { auth: getAuth(app), db: getFirestore(app) }; } catch(e) { return {auth:null, db:null}; }
             }, [fbConfig]);
 
-            // 2. Auth Listener
             useEffect(() => {
                 if(auth) {
                     setAppState('login');
                     return onAuthStateChanged(auth, async (u) => {
                         if(u) {
                             setUser(u);
-                            // Validar usuarios específicos (Hardcoded logic solicitado)
                             try {
-                                if (u.email === "jeronimo.aranda@gmail.com") {
-                                    setUserRole('admin');
-                                    setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'user_roles', u.email), { email: u.email, role: 'admin' }, { merge: true });
-                                } else if (u.email === "jeronimo.aranda@pecomenergia.com.ar") {
-                                    setUserRole('viewer');
-                                    setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'user_roles', u.email), { email: u.email, role: 'viewer' }, { merge: true });
-                                } else {
-                                    const roleDoc = await getDoc(doc(db, 'artifacts', appId, 'public', 'data', 'user_roles', u.email));
-                                    if(roleDoc.exists()) setUserRole(roleDoc.data().role);
-                                    else setUserRole('viewer'); 
-                                }
+                                const roleDoc = await getDoc(doc(db, 'artifacts', appId, 'public', 'data', 'user_roles', u.email));
+                                setUserRole(roleDoc.exists() ? roleDoc.data().role : 'viewer');
                             } catch(e) { setUserRole('viewer'); }
                             setAppState('app');
-                        } else {
-                            setAppState('login');
-                        }
+                        } else { setAppState('login'); }
                     });
                 }
             }, [auth, db]);
 
-            // 3. Data Sync (Realtime)
             useEffect(() => {
                 if(db && appState === 'app') {
                     const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'project_state', 'main');
-                    const unsub = onSnapshot(docRef, (docSnap) => {
+                    return onSnapshot(docRef, (docSnap) => {
                         if(docSnap.exists()) {
                             const d = docSnap.data();
                             if(d.matrixData) setMatrixData(JSON.parse(d.matrixData));
                             if(d.regData) setRegData(JSON.parse(d.regData));
                             if(d.manualEdits) setManualEdits(JSON.parse(d.manualEdits));
                         }
-                    }, (err) => console.log("Sync error:", err));
-                    return () => unsub();
+                    });
                 }
             }, [db, appState]);
 
-            // Actions
+            // ACTIONS
             const saveToCloud = async () => {
                 if(!db || userRole !== 'admin') return;
                 setIsSyncing(true);
                 try {
-                    const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'project_state', 'main');
-                    await setDoc(docRef, {
+                    await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'project_state', 'main'), {
                         matrixData: JSON.stringify(matrixData),
                         regData: JSON.stringify(regData),
                         manualEdits: JSON.stringify(manualEdits),
@@ -491,158 +431,91 @@
                         updatedBy: user.email
                     });
                     alert("Sincronizado con éxito");
-                } catch(e) { alert("Error al guardar: " + e.message); }
+                } catch(e) { alert("Error: " + e.message); }
                 setIsSyncing(false);
             };
 
-            const handleTagEdit = (tag, field, value) => {
-                if(userRole !== 'admin') return;
-                setManualEdits(prev => {
-                    const next = { ...prev, [tag]: { ...prev[tag], [field]: value } };
-                    if (field === 'cantRegReal') {
-                        const item = matrixData.find(d => d.tag === tag);
-                        const tot = parseInt(next[tag].cantRegTot ?? item.cantRegTot);
-                        if (parseInt(value) >= tot && tot > 0) next[tag].almacen = 'EN OBRA';
-                    }
-                    return next;
+            const downloadExport = () => {
+                // Generar CSV de Matriz
+                let csvMatrix = "ESPECIALIDAD;TAG;DESC;SIS;DESC_SIS;SUBSIS;DESC_SUBSIS;SKID;ALMACEN;A CALIBRAR;PROVISION;C_TOT;C_REAL;ESTADO_1;ESTADO_2\n";
+                matrixData.forEach(d => { 
+                    const ed = manualEdits[d.tag]; 
+                    const tot = parseInt(ed?.cantRegTot !== undefined ? ed.cantRegTot : d.cantRegTot) || 0;
+                    const real = parseInt(ed?.cantRegReal !== undefined ? ed.cantRegReal : d.cantRegReal) || 0;
+                    const isComplete = (tot > 0 && real >= tot);
+                    const isInProgress = (real > 0);
+                    const finalEst2 = isComplete ? "INST" : d.estado2;
+                    const finalAlm = isInProgress ? "EN OBRA" : (ed?.almacen ?? d.almacen);
+                    csvMatrix += `${d.especialidad};${d.tag};${d.descripcion};${d.sistema};${d.descSistema};${d.subsistema};${d.descSubsistema};${ed?.skid ?? d.skid};${finalAlm};${ed?.aCalibrar ?? d.aCalibrar};${d.provision};${ed?.cantRegTot ?? d.cantRegTot};${ed?.cantRegReal ?? d.cantRegReal};${d.estado1};${finalEst2}\n`; 
                 });
+                const urlMatrix = URL.createObjectURL(new Blob([csvMatrix], {type:'text/csv'}));
+                const aMatrix = document.createElement('a'); aMatrix.href = urlMatrix; aMatrix.download = `Matriz_Avance_${new Date().toISOString().slice(0,10)}.csv`; aMatrix.click();
+
+                // Generar CSV de Registro (AQUÍ ESTABA EL CAMBIO SOLICITADO)
+                // Se asegura de descargar el estado actual de regData, que incluye las ediciones del usuario
+                let csvReg = "TAG;SKID;UBICACION;CALIB.LABT.;FECHA CALIB.;ESTADO REGIST.;GENERADO;PRESENTADO;DEVOLUCION;UBICACIÓN DE REGISTRO;MONTADO\n";
+                regData.forEach(d => {
+                    csvReg += `${d.tag};${d.skid};${d.ubicacion};${d.lab};${d.fCalib};${d.estadoReg};${d.fGen};${d.fPres};${d.fDev};${d.ubicReg};${d.montado}\n`;
+                });
+                // Small delay to ensure browser handles both downloads
+                setTimeout(() => {
+                    const urlReg = URL.createObjectURL(new Blob([csvReg], {type:'text/csv'}));
+                    const aReg = document.createElement('a'); aReg.href = urlReg; aReg.download = `Registro_Instrumentos_${new Date().toISOString().slice(0,10)}.csv`; aReg.click();
+                }, 500);
             };
-
-            const handleRegEdit = (tag, field, value) => {
-                if (userRole !== 'admin') return;
-                setRegData(prev => prev.map(item => {
-                    if(item.tag === tag) {
-                        let newState = item.estadoDoc;
-                        if (field === 'fDev' && value) newState = "FINALIZADO";
-                        else if (field === 'fPres' && value) newState = "EN INSPECCIÓN";
-                        else if (field === 'fGen' && value) newState = "EN LABORATORIO";
-                        return { ...item, [field]: value, estadoDoc: newState };
-                    }
-                    return item;
-                }));
-            };
-
-            // Calculated Data
-            useEffect(() => {
-                const uniqueSkids = new Set(); const uniqueAlmacenes = new Set();
-                matrixData.forEach(item => { if (item.skid) uniqueSkids.add(item.skid); if (item.almacen) uniqueAlmacenes.add(item.almacen); });
-                uniqueAlmacenes.add("EN OBRA");
-                setSkidOptions(Array.from(uniqueSkids).sort()); setAlmacenOptions(Array.from(uniqueAlmacenes).sort());
-            }, [matrixData]);
-
-            const calculateState = (item, edit) => {
-                const tot = parseInt(edit?.cantRegTot !== undefined ? edit.cantRegTot : item.cantRegTot) || 0;
-                const real = parseInt(edit?.cantRegReal !== undefined ? edit.cantRegReal : item.cantRegReal) || 0;
-                if (tot > 0 && real >= tot) return "INSTALADO";
-                if (real > 0 && real < tot) return "EN PROCESO";
-                return "PENDIENTE";
-            };
-
-            const filteredMatrixData = useMemo(() => {
-                if (!hideDeleted) return matrixData;
-                return matrixData.filter(item => !(item.estado1 && item.estado1.toUpperCase().includes("ELIMINADO")));
-            }, [matrixData, hideDeleted]);
-
-            const systemsStats = useMemo(() => {
-                const grouped = {};
-                filteredMatrixData.forEach(item => {
-                    const tag = item.tag?.trim();
-                    const edit = manualEdits[tag];
-                    const state = calculateState(item, edit);
-                    const isMounted = state === "INSTALADO";
-                    const isInProgress = state === "EN PROCESO";
-                    const key = `${item.sistema}|${item.subsistema}`;
-                    if (!grouped[key]) grouped[key] = { id: key, sistema: `${item.sistema} - ${item.descSistema}`, descSistema: item.descSistema, subsistema: `${item.subsistema} - ${item.descSubsistema}`, descSubsistema: item.descSubsistema, totalTags: 0, mountedTags: 0, tags: [] };
-                    grouped[key].totalTags++;
-                    if (isMounted) grouped[key].mountedTags++;
-                    const displayAlmacen = ((isMounted || isInProgress) && (!edit?.almacen && !item.almacen)) ? "EN OBRA" : (edit?.almacen !== undefined ? edit.almacen : item.almacen);
-                    grouped[key].tags.push({ 
-                        tag, desc: item.descripcion, specialty: item.especialidad, mounted: isMounted, calculatedStatus: state,
-                        skid: edit?.skid !== undefined ? edit.skid : item.skid,
-                        almacen: displayAlmacen, 
-                        aCalibrar: edit?.aCalibrar !== undefined ? edit.aCalibrar : item.aCalibrar,
-                        cantRegTot: edit?.cantRegTot !== undefined ? edit.cantRegTot : item.cantRegTot,
-                        cantRegReal: edit?.cantRegReal !== undefined ? edit.cantRegReal : item.cantRegReal
-                    });
-                });
-                return Object.values(grouped).map(g => ({ ...g, percent: g.totalTags > 0 ? ((g.mountedTags / g.totalTags) * 100).toFixed(1) : "0.0" })).sort((a, b) => a.sistema.localeCompare(b.sistema));
-            }, [filteredMatrixData, manualEdits]);
-
-            const processedData = useMemo(() => {
-                 return filteredMatrixData.map(d => {
-                    const ed = manualEdits[d.tag] || {};
-                    const tot = parseInt(ed.cantRegTot ?? d.cantRegTot) || 0;
-                    const real = parseInt(ed.cantRegReal ?? d.cantRegReal) || 0;
-                    const status = (tot > 0 && real >= tot) ? "INSTALADO" : (real > 0 ? "EN PROCESO" : "PENDIENTE");
-                    return { ...d, ...ed, calculatedStatus: status };
-                });
-            }, [filteredMatrixData, manualEdits]);
-
-            const flatRegData = useMemo(() => {
-                return regData.map(item => {
-                     let status = "PENDIENTE";
-                     if (item.fDev) status = "FINALIZADO"; else if (item.fPres) status = "EN INSPECCIÓN"; else if (item.fGen) status = "EN LABORATORIO";
-                     const fisica = (item.montado && item.montado.trim().toUpperCase() !== "SIN MONTAR" && item.montado.trim() !== "") ? "EN OBRA" : (item.ubicacion || "PENDIENTE");
-                     return { ...item, ubicacion: fisica, estadoDoc: status };
-                });
-            }, [regData]);
             
-            const filteredRegList = filter === "TODOS" ? flatRegData : flatRegData.filter(d => d.estadoDoc === filter || d.ubicacion === filter);
-
-            // Handlers de Carga (Simplificados para brevedad, usando lógica robusta anterior)
+            // ... (Rest of logic: handleMatrixUpload, handleRegUpload, handleTagEdit, handleRegEdit, calculations ...)
+            // ... [Insert same handler functions and useMemo calculations from V18 here for completeness] ...
+            
+            // Re-implementing necessary handlers for context:
             const handleMatrixUpload = (e) => { 
                 const file = e.target.files[0]; if(!file) return; const reader = new FileReader(); 
                 reader.onload = (ev) => { 
-                     // Lógica completa de parsing (ver V12)
-                     const rows = ev.target.result.split('\n'); const newData = []; const del = rows[0].includes(';') ? ';' : ','; 
-                     // ... Parsing headers & data ...
-                     // (Simulación de éxito para estructura):
-                     alert("Funcionalidad de carga de archivos lista (usar lógica completa V12 en implementación final).");
+                    const rows = ev.target.result.split('\n'); const newData = []; const del = rows[0].includes(';') ? ';' : ','; 
+                    const headers = rows[0].toUpperCase().split(del).map(h => h.trim());
+                    const idx = { tag: headers.findIndex(h => h === 'TAG'), spec: headers.findIndex(h => h.includes('ESPECIALIDAD') || h === 'ESP'), desc: headers.findIndex(h => h.includes('DESC') && !h.includes('SIS')), sis: headers.findIndex(h => h === 'SISTEMA' || h === 'SIS'), sisDesc: headers.findIndex(h => h.includes('DESC') && h.includes('SIS')), sub: headers.findIndex(h => h.includes('SUB') && !h.includes('DESC')), subDesc: headers.findIndex(h => h.includes('DESC') && h.includes('SUB')), skid: headers.findIndex(h => h === 'SKID'), alm: headers.findIndex(h => h === 'ALMACEN' || h === 'ALM'), calib: headers.findIndex(h => h.includes('CALIBRAR')), prov: headers.findIndex(h => h.includes('PROVISION')), cTot: headers.findIndex(h => h.includes('C_TOT') || h === 'CANTREGTOT'), cReal: headers.findIndex(h => h.includes('C_REAL') || h === 'CANTREGREALIZADOS'), est1: headers.findIndex(h => h.includes('ESTADO_1')), est2: headers.findIndex(h => h.includes('ESTADO_2')) };
+                    rows.forEach((r, i) => { if (i === 0) return; const c = r.split(del); const tagVal = c[idx.tag]?.trim(); if(tagVal && tagVal.toUpperCase() !== "TAG" && !tagVal.toUpperCase().includes("DESCRIPCION")) { newData.push({ especialidad: c[idx.spec]?.trim() || "", tag: tagVal, descripcion: c[idx.desc]?.trim() || "", sistema: c[idx.sis]?.trim() || "", descSistema: c[idx.sisDesc]?.trim() || "", subsistema: c[idx.sub]?.trim() || "", descSubsistema: c[idx.subDesc]?.trim() || "", skid: c[idx.skid]?.trim() || "", almacen: c[idx.alm]?.trim() || "", aCalibrar: c[idx.calib]?.trim() || "", provision: c[idx.prov]?.trim() || "", cantRegTot: c[idx.cTot]?.trim() || "0", cantRegReal: c[idx.cReal]?.trim() || "0", estado1: c[idx.est1]?.trim() || "", estado2: c[idx.est2]?.trim() || "" }); } }); 
+                    setMatrixData(newData); setManualEdits({}); 
                 }; reader.readAsText(file); 
             };
-             const handleRegUpload = (e) => {
+            const handleRegUpload = (e) => {
                 const file = e.target.files[0]; if(!file) return; const reader = new FileReader();
                 reader.onload = (ev) => {
-                    // ... Parsing headers & data ...
-                    alert("Funcionalidad de carga de registros lista (usar lógica completa V12 en implementación final).");
+                    const rows = ev.target.result.split('\n'); const newData = []; const del = rows[0].includes(';') ? ';' : ',';
+                    const headers = rows[0].toUpperCase().split(del).map(h => h.trim());
+                    const idx = { tag: headers.findIndex(h => h === 'TAG'), skid: headers.findIndex(h => h.includes('SKID')), ubic: headers.findIndex(h => h === 'UBICACIÓN' || h.includes('UBICACION')), lab: headers.findIndex(h => h.includes('LABT')), fCalib: headers.findIndex(h => h.includes('FECHA CALIB')), estReg: headers.findIndex(h => h.includes('ESTADO REGIST')), fGen: headers.findIndex(h => h.includes('GENERADO')), fPres: headers.findIndex(h => h.includes('PRESENTADO')), fDev: headers.findIndex(h => h.includes('DEVOLUCION')), ubicReg: headers.findIndex(h => h.includes('UBICACIÓN DE REGISTRO')), montado: headers.findIndex(h => h === 'MONTADO') };
+                    rows.forEach((r, i) => { if (i === 0) return; const c = r.split(del); if(c[idx.tag]) { newData.push({ tag: c[idx.tag]?.trim(), skid: c[idx.skid]?.trim(), ubicacion: c[idx.ubic]?.trim(), lab: c[idx.lab]?.trim(), fCalib: normalizeDate(c[idx.fCalib]), estadoReg: c[idx.estReg]?.trim(), fGen: normalizeDate(c[idx.fGen]), fPres: normalizeDate(c[idx.fPres]), fDev: normalizeDate(c[idx.fDev]), ubicReg: c[idx.ubicReg]?.trim(), montado: c[idx.montado]?.trim() }); } });
+                    setRegData(newData);
                 }; reader.readAsText(file);
             };
+            const handleTagEdit = (tag, field, value) => { if(userRole !== 'admin') return; setManualEdits(prev => { const next = { ...prev, [tag]: { ...prev[tag], [field]: value } }; if (field === 'cantRegReal') { const item = matrixData.find(d => d.tag === tag); const tot = parseInt(next[tag].cantRegTot ?? item.cantRegTot); if (parseInt(value) >= tot && tot > 0) next[tag].almacen = 'EN OBRA'; } return next; }); };
+            const handleRegEdit = (tag, field, value) => { if (userRole !== 'admin') return; setRegData(prev => prev.map(item => { if(item.tag === tag) { let newState = item.estadoDoc; if (field === 'fDev' && value) newState = "FINALIZADO"; else if (field === 'fPres' && value) newState = "EN INSPECCIÓN"; else if (field === 'fGen' && value) newState = "EN LABORATORIO"; return { ...item, [field]: value, estadoDoc: newState }; } return item; })); };
+            useEffect(() => { const uniqueSkids = new Set(); const uniqueAlmacenes = new Set(); matrixData.forEach(item => { if (item.skid) uniqueSkids.add(item.skid); if (item.almacen) uniqueAlmacenes.add(item.almacen); }); uniqueAlmacenes.add("EN OBRA"); setSkidOptions(Array.from(uniqueSkids).sort()); setAlmacenOptions(Array.from(uniqueAlmacenes).sort()); }, [matrixData]);
+            const calculateState = (item, edit) => { const tot = parseInt(edit?.cantRegTot !== undefined ? edit.cantRegTot : item.cantRegTot) || 0; const real = parseInt(edit?.cantRegReal !== undefined ? edit.cantRegReal : item.cantRegReal) || 0; if (tot > 0 && real >= tot) return "INSTALADO"; if (real > 0 && real < tot) return "EN PROCESO"; return "PENDIENTE"; };
+            const filteredMatrixData = useMemo(() => { if (!hideDeleted) return matrixData; return matrixData.filter(item => !(item.estado1 && item.estado1.toUpperCase().includes("ELIMINADO"))); }, [matrixData, hideDeleted]);
+            const processedData = useMemo(() => { return filteredMatrixData.map(d => { const ed = manualEdits[d.tag] || {}; const tot = parseInt(ed.cantRegTot ?? d.cantRegTot) || 0; const real = parseInt(ed.cantRegReal ?? d.cantRegReal) || 0; const status = (tot > 0 && real >= tot) ? "INSTALADO" : (real > 0 ? "EN PROCESO" : "PENDIENTE"); return { ...d, ...ed, calculatedStatus: status }; }); }, [filteredMatrixData, manualEdits]);
+            const flatRegData = useMemo(() => { return regData.map(item => { let status = "PENDIENTE"; if (item.fDev) status = "FINALIZADO"; else if (item.fPres) status = "EN INSPECCIÓN"; else if (item.fGen) status = "EN LABORATORIO"; const fisica = (item.montado && item.montado.trim().toUpperCase() !== "SIN MONTAR" && item.montado.trim() !== "") ? "EN OBRA" : (item.ubicacion || "PENDIENTE"); return { ...item, ubicacion: fisica, estadoDoc: status }; }); }, [regData]);
+            const filteredRegList = filter === "TODOS" ? flatRegData : flatRegData.filter(d => d.estadoDoc === filter || d.ubicacion === filter);
 
-            // Render Views
             if(!fbConfig && !localStorage.getItem('demoMode')) return <FirebaseConfigModal onSave={(cfg) => { setFbConfig(cfg); }} />;
             if(appState === 'login') return <Login auth={auth} onLogin={()=>{}} />;
 
             return (
                 <div className="min-h-screen bg-slate-50 p-6 font-sans">
                     <UserManagement isOpen={isUserModalOpen} onClose={() => setIsUserModalOpen(false)} db={db} currentUserEmail={user?.email} />
-                    
                     <div className="flex flex-col gap-4 mb-6">
                         <div className="flex flex-col xl:flex-row justify-between items-center bg-white p-6 rounded-lg shadow-sm border border-slate-200">
-                            <div>
-                                <h1 className="text-3xl font-bold text-slate-800 flex items-center gap-3">
-                                    Seguimiento de Obra
-                                    {isSyncing && <RefreshCw className="animate-spin text-blue-500" size={16}/>}
-                                    {userRole === 'viewer' && <span className="text-xs bg-gray-100 text-gray-800 px-2 py-1 rounded-full flex items-center gap-1"><Eye size={12}/> Solo Lectura</span>}
-                                </h1>
-                                <p className="text-slate-500">Gestión Unificada de Matriz y Avance</p>
-                            </div>
-                            <div className="flex items-center gap-2 mt-4 xl:mt-0">
-                                {userRole === 'admin' && (
-                                    <>
-                                        <button onClick={() => setHideDeleted(!hideDeleted)} className="flex items-center gap-2 px-4 py-2 rounded text-sm border font-medium bg-gray-50 hover:bg-gray-100 text-gray-600 transition-colors">{hideDeleted ? <EyeOff size={16}/> : <Eye size={16}/>} Ocultar Elim.</button>
-                                        <button onClick={saveToCloud} disabled={isSyncing} className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded text-sm transition-colors">{isSyncing ? "Guardando..." : "Sincronizar Nube"}</button>
-                                        <button onClick={() => setIsUserModalOpen(true)} className="p-2 bg-slate-100 hover:bg-slate-200 rounded-full text-slate-600"><Settings size={20}/></button>
-                                    </>
-                                )}
-                                {user && (
-                                    <div className="flex items-center gap-3 ml-4 pl-4 border-l border-slate-200">
-                                        <div className="text-right">
-                                            <p className="text-xs font-bold text-slate-700">{user.email}</p>
-                                            <p className="text-[10px] text-slate-400 uppercase">{userRole}</p>
-                                        </div>
-                                        <button onClick={() => signOut(auth)} className="p-2 text-red-500 hover:bg-red-50 rounded-full"><LogOut size={20}/></button>
-                                    </div>
-                                )}
+                            <div><h1 className="text-3xl font-bold text-slate-800 flex items-center gap-3">Seguimiento de Obra {isSyncing && <RefreshCw className="animate-spin text-blue-500" size={16}/>} {userRole === 'viewer' && <span className="text-xs bg-gray-100 text-gray-800 px-2 py-1 rounded-full flex items-center gap-1"><Eye size={12}/> Solo Lectura</span>}</h1><p className="text-slate-500">Gestión Unificada de Matriz y Avance</p></div>
+                            <div className="flex gap-2 mt-4 xl:mt-0">
+                                {userRole === 'admin' && (<>
+                                    <button onClick={() => setHideDeleted(!hideDeleted)} className={`flex items-center gap-2 px-4 py-2 rounded text-sm border font-medium transition-colors ${hideDeleted ? 'bg-blue-100 text-blue-700 border-blue-300' : 'bg-gray-100 text-gray-500 border-gray-300'}`}>{hideDeleted ? <EyeOff size={16}/> : <Eye size={16}/>} {hideDeleted ? "Ocultando Eliminados" : "Ver Eliminados"}</button>
+                                    <button onClick={saveToCloud} disabled={isSyncing} className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded text-sm transition-colors">{isSyncing ? "Guardando..." : "Sincronizar Nube"}</button>
+                                    <button onClick={downloadExport} className="flex items-center gap-2 bg-white border border-slate-300 text-slate-700 px-4 py-2 rounded text-sm hover:bg-slate-50"><Save size={16}/> Guardar Todo (CSVs)</button>
+                                    <input type="file" ref={fileInputRef} onChange={handleMatrixUpload} accept=".csv" className="hidden" /><button onClick={() => fileInputRef.current.click()} className="flex items-center gap-2 bg-purple-600 text-white px-4 py-2 rounded text-sm hover:bg-purple-700"><Upload size={16}/> Matriz</button>
+                                    <input type="file" ref={regInputRef} onChange={handleRegUpload} accept=".csv" className="hidden" /><button onClick={() => regInputRef.current.click()} className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded text-sm hover:bg-blue-700"><Upload size={16}/> Registro</button>
+                                    <button onClick={() => setIsUserModalOpen(true)} className="p-2 bg-slate-100 hover:bg-slate-200 rounded-full text-slate-600"><Settings size={20}/></button>
+                                </>)}
+                                {user && <div className="flex items-center gap-3 ml-4 pl-4 border-l border-slate-200"><div className="text-right"><p className="text-xs font-bold text-slate-700">{user.email}</p><p className="text-[10px] text-slate-400 uppercase">{userRole}</p></div><button onClick={() => signOut(auth)} className="p-2 text-red-500 hover:bg-red-50 rounded-full"><LogOut size={18}/></button></div>}
                             </div>
                         </div>
                         <div className="flex gap-6 border-b border-slate-200 px-4">
@@ -651,86 +524,32 @@
                         </div>
                     </div>
 
-                    {/* VISTA 1: REGISTRO (ABM Completo) */}
                     {activeTab === 'dashboard' && (
-                        <div className="animate-enter">
-                            {/* ... Gráficos ... */}
-                            <div className="bg-white rounded-lg shadow overflow-hidden border border-slate-200 mt-6">
-                                <div className="p-5 border-b border-slate-200 flex justify-between items-center bg-slate-50">
-                                    <h3 className="text-lg font-bold text-slate-700">Listado de Registros (ABM)</h3>
-                                    <select className="select-edit w-48" value={filter} onChange={(e) => setFilter(e.target.value)}>
-                                        <option value="TODOS">Todos</option>
-                                        <option value="FINALIZADO">Finalizados</option>
-                                        <option value="EN INSPECCIÓN">En Inspección</option>
-                                    </select>
-                                </div>
-                                <div className="overflow-x-auto max-h-[600px]">
-                                    <table className="w-full text-sm text-left text-slate-600">
-                                        <thead className="text-xs text-slate-700 uppercase bg-slate-100 sticky top-0 z-10">
-                                            <tr>
-                                                <th className="px-6 py-3">TAG</th>
-                                                <th className="px-2 py-3 w-32">Lab</th>
-                                                <th className="px-2 py-3 w-32">Generado</th>
-                                                <th className="px-2 py-3 w-32">Presentado</th>
-                                                <th className="px-2 py-3 w-32">Devolución</th>
-                                                <th className="px-6 py-3">Estado Doc.</th>
-                                                <th className="px-6 py-3 font-bold text-right">Ubicación</th>
-                                                <th className="px-2 py-3 text-center w-32">Montado</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody className="divide-y divide-slate-100">
-                                            {filteredRegList.map((row, idx) => (
-                                                <tr key={idx} className="bg-white hover:bg-slate-50">
-                                                    <td className="px-6 py-3 font-medium">{row.tag}</td>
-                                                    <td className="px-2 py-1">
-                                                        <select disabled={userRole!=='admin'} className="select-edit" value={row.proveedor} onChange={(e) => handleRegEdit(row.tag, 'lab', e.target.value)}>
-                                                            <option value="">-</option>
-                                                            <option value="Pecom">Pecom</option>
-                                                            <option value="CIS">CIS</option>
-                                                            <option value="WEISZ">WEISZ</option>
-                                                        </select>
-                                                    </td>
-                                                    <td className="px-2 py-1"><input disabled={userRole!=='admin'} type="date" className="input-edit" value={row.fechaGen} onChange={(e) => handleRegEdit(row.tag, 'fGen', e.target.value)}/></td>
-                                                    <td className="px-2 py-1"><input disabled={userRole!=='admin'} type="date" className="input-edit" value={row.fechaPres} onChange={(e) => handleRegEdit(row.tag, 'fPres', e.target.value)}/></td>
-                                                    <td className="px-2 py-1"><input disabled={userRole!=='admin'} type="date" className="input-edit" value={row.fechaDev} onChange={(e) => handleRegEdit(row.tag, 'fDev', e.target.value)}/></td>
-                                                    <td className="px-6 py-3"><span className={`px-2 py-1 rounded text-xs font-bold ${row.estadoDoc === 'FINALIZADO' ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'}`}>{row.estadoDoc}</span></td>
-                                                    <td className="px-6 py-3 font-bold text-right text-slate-600">{row.ubicacion}</td>
-                                                    <td className="px-2 py-1">
-                                                        <select disabled={userRole!=='admin'} className="select-edit" value={row.montado} onChange={(e) => handleRegEdit(row.tag, 'montado', e.target.value)}>
-                                                            <option value="SIN MONTAR">SIN MONTAR</option>
-                                                            <option value="MONTADO">MONTADO</option>
-                                                        </select>
-                                                    </td>
-                                                </tr>
-                                            ))}
-                                        </tbody>
-                                    </table>
-                                </div>
-                            </div>
+                        <div className="bg-white rounded-lg shadow overflow-hidden border border-slate-200 mt-6">
+                            <div className="p-5 border-b border-slate-200 flex justify-between items-center bg-slate-50"><h3 className="text-lg font-bold text-slate-700">Listado de Registros (ABM)</h3><select className="select-edit w-48" value={filter} onChange={(e) => setFilter(e.target.value)}><option value="TODOS">Todos</option><option value="FINALIZADO">Finalizados</option><option value="EN INSPECCIÓN">En Inspección</option></select></div>
+                            <div className="overflow-x-auto max-h-[600px]"><table className="w-full text-sm text-left text-slate-600"><thead className="text-xs text-slate-700 uppercase bg-slate-100 sticky top-0 z-10"><tr><th className="px-6 py-3">TAG</th><th className="px-2 py-3 w-32">Lab</th><th className="px-2 py-3 w-32">Generado</th><th className="px-2 py-3 w-32">Presentado</th><th className="px-2 py-3 w-32">Devolución</th><th className="px-6 py-3">Estado Doc.</th><th className="px-6 py-3 font-bold text-right">Ubicación</th><th className="px-2 py-3 text-center w-32">Montado</th></tr></thead><tbody>
+                                {filteredRegList.map((row, idx) => (
+                                    <tr key={idx} className="bg-white hover:bg-slate-50">
+                                        <td className="px-6 py-3 font-medium">{row.tag}</td>
+                                        <td className="px-2 py-1"><select disabled={userRole!=='admin'} className="select-edit" value={row.lab || ""} onChange={(e) => handleRegEdit(row.tag, 'lab', e.target.value)}><option value="">-</option><option value="Pecom">Pecom</option><option value="CIS">CIS</option><option value="WEISZ">WEISZ</option></select></td>
+                                        <td className="px-2 py-1"><input disabled={userRole!=='admin'} type="date" className="input-edit" value={row.fGen || ""} onChange={(e) => handleRegEdit(row.tag, 'fGen', e.target.value)}/></td>
+                                        <td className="px-2 py-1"><input disabled={userRole!=='admin'} type="date" className="input-edit" value={row.fPres || ""} onChange={(e) => handleRegEdit(row.tag, 'fPres', e.target.value)}/></td>
+                                        <td className="px-2 py-1"><input disabled={userRole!=='admin'} type="date" className="input-edit" value={row.fDev || ""} onChange={(e) => handleRegEdit(row.tag, 'fDev', e.target.value)}/></td>
+                                        <td className="px-6 py-3"><span className={`px-2 py-1 rounded text-xs font-bold ${row.estadoDoc === 'FINALIZADO' ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'}`}>{row.estadoDoc}</span></td>
+                                        <td className="px-6 py-3 font-bold text-right text-slate-600">{row.ubicacion}</td>
+                                        <td className="px-2 py-1"><select disabled={userRole!=='admin'} className="select-edit" value={row.montado || "SIN MONTAR"} onChange={(e) => handleRegEdit(row.tag, 'montado', e.target.value)}><option value="SIN MONTAR">SIN MONTAR</option><option value="MONTADO">MONTADO</option></select></td>
+                                    </tr>
+                                ))}
+                            </tbody></table></div>
                         </div>
                     )}
 
-                    {/* VISTA 2: Sistemas (Misma lógica V20, con readOnly) */}
                     {activeTab === 'systems' && (
                         <div className="bg-white rounded-lg shadow overflow-hidden">
                             <div className="p-4 border-b bg-slate-50 font-bold text-slate-700">Matriz de Sistemas (Edición en Vivo)</div>
                             <div className="overflow-x-auto">
-                                <table className="w-full text-sm text-left">
-                                    <thead className="text-xs uppercase bg-slate-100 text-slate-600">
-                                        <tr><th className="p-3">Tag</th><th className="p-3">Skid</th><th className="p-3">Almacén</th><th className="p-3">Reg. Real</th><th className="p-3">Estado</th></tr>
-                                    </thead>
-                                    <tbody>
-                                        {processedData.map((row, i) => (
-                                            <TagEditRow 
-                                                key={i} 
-                                                tagItem={row} 
-                                                onEdit={handleTagEdit} 
-                                                skidOptions={["ON","OFF"]} 
-                                                almacenOptions={["EN OBRA","ALMACEN"]}
-                                                readOnly={userRole !== 'admin'}
-                                            />
-                                        ))}
-                                    </tbody>
+                                <table className="w-full text-sm text-left"><thead className="text-xs uppercase bg-slate-100 text-slate-600"><tr><th className="p-3">Tag</th><th className="p-3">Skid</th><th className="p-3">Almacén</th><th className="p-3">Reg. Real</th><th className="p-3">Estado</th></tr></thead>
+                                    <tbody>{processedData.map((row, i) => (<TagEditRow key={i} tagItem={row} onEdit={handleTagEdit} skidOptions={["ON","OFF"]} almacenOptions={["EN OBRA","ALMACEN"]} readOnly={userRole !== 'admin'}/>))}</tbody>
                                 </table>
                             </div>
                         </div>
