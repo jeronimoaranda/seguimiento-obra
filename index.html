@@ -462,6 +462,9 @@
             const [pendingData, setPendingData] = useState(null);
             const [changeStats, setChangeStats] = useState(null);
             const [hideDeleted, setHideDeleted] = useState(true); 
+            
+            // UI Dropdown state
+            const [showExportMenu, setShowExportMenu] = useState(false);
 
             const [skidOptions, setSkidOptions] = useState([]);
             const [almacenOptions, setAlmacenOptions] = useState([]);
@@ -937,19 +940,48 @@
                 }
             };
 
-            const downloadExport = () => {
-                let csvContent = "data:text/csv;charset=utf-8,TAG;ESTADO;DOC_TOT;DOC_REAL\n";
+            const downloadMatrix = () => {
+                let csvContent = "data:text/csv;charset=utf-8,TAG;ESPECIALIDAD;DESCRIPCION;SISTEMA;SUBSISTEMA;SKID;ALMACEN;A_CALIBRAR;CANT_REG_TOT;CANT_REG_REAL;ESTADO_CALCULADO\n";
                 matrixData.forEach(row => {
                     const edit = manualEdits[row.tag];
                     const state = calculateState(row, edit);
-                    csvContent += `${row.tag};${state};${edit?.cantRegTot||row.cantRegTot};${edit?.cantRegReal||row.cantRegReal}\n`;
+                    const skid = edit?.skid !== undefined ? edit.skid : row.skid;
+                    const alm = edit?.almacen !== undefined ? edit.almacen : row.almacen;
+                    const calib = edit?.aCalibrar !== undefined ? edit.aCalibrar : row.aCalibrar;
+                    const cTot = edit?.cantRegTot !== undefined ? edit.cantRegTot : row.cantRegTot;
+                    const cReal = edit?.cantRegReal !== undefined ? edit.cantRegReal : row.cantRegReal;
+                    
+                    const line = [
+                        row.tag, row.especialidad, row.descripcion, row.sistema, row.subsistema,
+                        skid, alm, calib, cTot, cReal, state
+                    ].map(f => cleanStr(f)).join(';');
+                    csvContent += line + "\n";
                 });
                 const encodedUri = encodeURI(csvContent);
                 const link = document.createElement("a");
                 link.setAttribute("href", encodedUri);
-                link.setAttribute("download", "avance_obra.csv");
+                link.setAttribute("download", "matriz_abm.csv");
                 document.body.appendChild(link);
                 link.click();
+                document.body.removeChild(link);
+            };
+
+            const downloadRegistry = () => {
+                let csvContent = "data:text/csv;charset=utf-8,TAG;SKID;UBICACION;LAB;F_CALIB;ESTADO_REG;F_GEN;F_PRES;F_DEV;UBICACION_REG;MONTADO;PROVISION\n";
+                regData.forEach(row => {
+                    const line = [
+                        row.tag, row.skid, row.ubicacion, row.lab, row.fCalib, row.estadoReg,
+                        row.fGen, row.fPres, row.fDev, row.ubicReg, row.montado, row.provision
+                    ].map(f => cleanStr(f)).join(';');
+                    csvContent += line + "\n";
+                });
+                const encodedUri = encodeURI(csvContent);
+                const link = document.createElement("a");
+                link.setAttribute("href", encodedUri);
+                link.setAttribute("download", "registro_instrumentos.csv");
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
             };
 
             const docStatusCounts = useMemo(() => {
@@ -1012,7 +1044,24 @@
                             <div className="flex gap-2 mt-4 xl:mt-0">
                                 <button onClick={() => setHideDeleted(!hideDeleted)} className={`flex items-center gap-2 px-4 py-2 rounded text-sm border font-medium transition-colors ${hideDeleted ? 'bg-blue-100 text-blue-700 border-blue-300' : 'bg-gray-100 text-gray-500 border-gray-300'}`}>{hideDeleted ? <EyeOff size={16}/> : <Eye size={16}/>} {hideDeleted ? "Ocultando Eliminados" : "Ver Eliminados"}</button>
                                 
-                                <button onClick={downloadExport} className="flex items-center gap-2 bg-white border border-slate-300 text-slate-700 px-4 py-2 rounded text-sm hover:bg-slate-50"><Save size={16}/> Guardar (CSV)</button>
+                                <div className="relative">
+                                    <button onClick={() => setShowExportMenu(!showExportMenu)} className="flex items-center gap-2 bg-white border border-slate-300 text-slate-700 px-4 py-2 rounded text-sm hover:bg-slate-50">
+                                        <Save size={16}/> Guardar (CSV) <ChevronDown size={14}/>
+                                    </button>
+                                    {showExportMenu && (
+                                        <>
+                                            <div className="fixed inset-0 z-40" onClick={() => setShowExportMenu(false)}></div>
+                                            <div className="absolute right-0 mt-1 w-56 bg-white rounded-md shadow-lg z-50 border border-slate-200 py-1">
+                                                <button onClick={() => { downloadMatrix(); setShowExportMenu(false); }} className="w-full text-left px-4 py-2 text-sm text-slate-700 hover:bg-slate-50 flex items-center gap-2">
+                                                    <Layers size={14}/> Matriz ABM
+                                                </button>
+                                                <button onClick={() => { downloadRegistry(); setShowExportMenu(false); }} className="w-full text-left px-4 py-2 text-sm text-slate-700 hover:bg-slate-50 flex items-center gap-2">
+                                                    <LayoutDashboard size={14}/> Reg. Instrumentos
+                                                </button>
+                                            </div>
+                                        </>
+                                    )}
+                                </div>
 
                                 {/* CONTROLES DE ADMIN */}
                                 {role === 'admin' && (
