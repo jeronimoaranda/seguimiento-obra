@@ -313,6 +313,15 @@
                         <Icon size={compact ? 20 : 24} color={color} />
                     </div>
                 </div>
+                {/* BARRA DE PROGRESO AGREGADA */}
+                {percentage && (
+                    <div className="w-full bg-slate-100 rounded-full h-1.5 mt-3">
+                        <div 
+                            className="h-1.5 rounded-full transition-all duration-500" 
+                            style={{ width: `${percentage}%`, backgroundColor: color }}
+                        ></div>
+                    </div>
+                )}
                 {subtext && <p className="text-xs text-slate-400 mt-2 z-10 relative">{subtext}</p>}
             </div>
         );
@@ -1268,3 +1277,4 @@
     </script>
 </body>
 </html>
+}
