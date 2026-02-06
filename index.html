@@ -36,7 +36,6 @@
         .tab-inactive { color: #64748b; font-weight: 500; }
         .tab-inactive:hover { color: #334155; }
         
-        /* Estilos condicionales para inputs deshabilitados (modo lectura) */
         .input-edit:disabled, .select-edit:disabled {
             background-color: #f1f5f9;
             color: #94a3b8;
@@ -63,12 +62,43 @@
         import React, { useState, useMemo, useRef, useEffect } from 'react';
         import { createRoot } from 'react-dom/client';
         import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, PieChart, Pie, Cell, ResponsiveContainer, Label, LabelList } from 'recharts';
-        import { AlertCircle, CheckCircle, Clock, Activity, Upload, Trash2, HardHat, Download, X, AlertTriangle, Target, Layers, FileSpreadsheet, LayoutDashboard, ChevronDown, ChevronRight, Boxes, PlayCircle, Wrench, Zap, Hammer, FileWarning, Package, Truck, ClipboardCheck, Edit3, Save, Eye, EyeOff, FileCheck, RefreshCw, CalendarDays, Search, FileText, MapPin, Box, LogIn, User, Shield, LogOut, Database } from 'lucide-react';
+        import { AlertCircle, CheckCircle, Clock, Activity, Upload, Trash2, HardHat, Download, X, AlertTriangle, Target, Layers, FileSpreadsheet, LayoutDashboard, ChevronDown, ChevronRight, Boxes, PlayCircle, Wrench, Zap, Hammer, FileWarning, Package, Truck, ClipboardCheck, Edit3, Save, Eye, EyeOff, FileCheck, RefreshCw, CalendarDays, Search, FileText, MapPin, Box, LogIn, User, Shield, LogOut, Database, Settings } from 'lucide-react';
         
         // --- FIREBASE IMPORTS ---
         import { initializeApp } from "firebase/app";
         import { getAuth, signInWithCustomToken, signInAnonymously, onAuthStateChanged, signOut, signInWithEmailAndPassword, createUserWithEmailAndPassword } from "firebase/auth";
         import { getFirestore, doc, setDoc, onSnapshot, collection } from "firebase/firestore";
+
+        // --- GESTIÓN DE CONFIGURACIÓN SEGURA ---
+        const getFirebaseConfig = () => {
+            // Caso 1: Entorno Immersive (Variables globales inyectadas)
+            if (typeof __firebase_config !== 'undefined' && typeof __app_id !== 'undefined') {
+                try {
+                    return {
+                        config: JSON.parse(__firebase_config),
+                        appId: __app_id,
+                        isConfigured: true
+                    };
+                } catch (e) {
+                    console.error("Error parseando config inyectada", e);
+                }
+            }
+            
+            // Caso 2: GitHub Pages / Localhost (Configuración Manual Requerida)
+            // IMPORTANTE: Si subes esto a GitHub, reemplaza los valores de abajo con los de tu proyecto Firebase real.
+            return {
+                config: {
+                    apiKey: "TU_API_KEY_AQUI",
+                    authDomain: "tu-proyecto.firebaseapp.com",
+                    projectId: "tu-proyecto",
+                    storageBucket: "tu-proyecto.appspot.com",
+                    messagingSenderId: "123456789",
+                    appId: "1:123456789:web:abcdef"
+                },
+                appId: "demo-app-id", 
+                isConfigured: false // Cambiar a true cuando hayas puesto tus datos reales
+            };
+        };
 
         // --- FUNCIONES DE LIMPIEZA & UTILS ---
         const cleanStr = (str) => {
@@ -171,7 +201,7 @@
         };
 
         // --- LOGIN COMPONENT ---
-        const LoginScreen = ({ onLogin, loading }) => {
+        const LoginScreen = ({ onLogin, loading, isConfigured }) => {
             const [mode, setMode] = useState('view'); // 'view' or 'admin'
             const [email, setEmail] = useState('');
             const [password, setPassword] = useState('');
@@ -181,6 +211,10 @@
             const handleSubmit = (e) => {
                 e.preventDefault();
                 setError('');
+                if(!isConfigured) {
+                    setError('La aplicación no está configurada para conectarse a Firebase.');
+                    return;
+                }
                 if (mode === 'view') {
                     onLogin('view');
                 } else {
@@ -200,6 +234,13 @@
                             <p className="text-blue-100 text-sm">Plataforma Colaborativa en Tiempo Real</p>
                         </div>
                         
+                        {!isConfigured && (
+                            <div className="bg-yellow-50 border-b border-yellow-200 p-4 text-yellow-800 text-xs">
+                                <strong className="flex items-center gap-2 mb-1"><Settings size={14}/> Configuración Requerida</strong>
+                                Para usar esta app fuera del editor (ej: GitHub), debes editar el archivo <code>index.html</code> y agregar tus credenciales de Firebase en la función <code>getFirebaseConfig</code>.
+                            </div>
+                        )}
+
                         <div className="p-8">
                             <div className="flex gap-4 mb-6 border-b border-slate-200 pb-2">
                                 <button 
@@ -236,7 +277,7 @@
 
                                 {error && <div className="bg-red-50 text-red-600 p-3 rounded text-sm flex items-center gap-2"><AlertCircle size={16}/> {error}</div>}
 
-                                <button disabled={loading} type="submit" className="mt-4 bg-blue-600 hover:bg-blue-700 text-white py-2 rounded font-bold shadow-lg transform active:scale-95 transition-all flex justify-center items-center gap-2">
+                                <button disabled={loading || !isConfigured} type="submit" className={`mt-4 py-2 rounded font-bold shadow-lg transform active:scale-95 transition-all flex justify-center items-center gap-2 ${!isConfigured ? 'bg-gray-300 cursor-not-allowed text-gray-500' : 'bg-blue-600 hover:bg-blue-700 text-white'}`}>
                                     {loading ? <RefreshCw className="animate-spin"/> : <LogIn size={18} />}
                                     {mode === 'view' ? 'Ingresar como Invitado' : (isRegistering ? 'Registrar y Entrar' : 'Iniciar Sesión')}
                                 </button>
@@ -392,6 +433,7 @@
             const [role, setRole] = useState('viewer'); // 'viewer' | 'admin'
             const [loadingAuth, setLoadingAuth] = useState(true);
             const [loadingData, setLoadingData] = useState(false);
+            const [errorMsg, setErrorMsg] = useState('');
 
             // Data State
             const [matrixData, setMatrixData] = useState([]);
@@ -415,20 +457,26 @@
             const [skidOptions, setSkidOptions] = useState([]);
             const [almacenOptions, setAlmacenOptions] = useState([]);
 
-            // Firebase Globals
-            const firebaseConfig = JSON.parse(__firebase_config);
-            const app = useMemo(() => initializeApp(firebaseConfig), []);
-            const auth = useMemo(() => getAuth(app), [app]);
-            const db = useMemo(() => getFirestore(app), [app]);
-            const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+            // Firebase Globals - Init Seguro
+            const { config, appId, isConfigured } = useMemo(() => getFirebaseConfig(), []);
+            
+            const app = useMemo(() => isConfigured ? initializeApp(config) : null, [config, isConfigured]);
+            const auth = useMemo(() => app ? getAuth(app) : null, [app]);
+            const db = useMemo(() => app ? getFirestore(app) : null, [app]);
 
             // --- 1. INITIALIZE FIREBASE AUTH ---
             useEffect(() => {
+                if(!auth) {
+                    setLoadingAuth(false);
+                    return;
+                }
+
                 const initAuth = async () => {
                     if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
-                        await signInWithCustomToken(auth, __initial_auth_token);
+                        try {
+                            await signInWithCustomToken(auth, __initial_auth_token);
+                        } catch(e) { console.error("Auto login error", e); }
                     }
-                    // No automatic anonymous sign in, wait for user interaction
                     setLoadingAuth(false);
                 };
                 initAuth();
@@ -436,10 +484,9 @@
                 const unsubscribe = onAuthStateChanged(auth, (u) => {
                     setUser(u);
                     setLoadingAuth(false);
-                    // Determine Role strictly by authentication method or UID (Mock logic for demo)
                     if (u) {
                         if (u.isAnonymous) setRole('viewer');
-                        else setRole('admin'); // Email auth = Admin
+                        else setRole('admin'); 
                     }
                 });
                 return () => unsubscribe();
@@ -447,11 +494,11 @@
 
             // --- 2. FIRESTORE DATA SYNC ---
             useEffect(() => {
-                if (!user) return;
+                if (!user || !db || !isConfigured) return;
                 setLoadingData(true);
+                setErrorMsg('');
                 
-                // Use a single document for atomic updates (simpler for this use case)
-                // FIX: Added 'main' segment to ensure even number of path segments (Collection/Doc/Col/Doc...)
+                // Usamos path con segmento par (/main)
                 const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'instrument_app', 'main');
                 
                 const unsub = onSnapshot(docRef, (snap) => {
@@ -461,7 +508,6 @@
                         if (data.registry) setRegData(JSON.parse(data.registry));
                         if (data.edits) setManualEdits(data.edits);
                     } else {
-                        // DB empty?
                         setMatrixData([]);
                         setRegData([]);
                     }
@@ -469,16 +515,21 @@
                 }, (err) => {
                     console.error("Error fetching data:", err);
                     setLoadingData(false);
+                    // Detección específica de error de permisos para UI amigable
+                    if(err.code === 'permission-denied') {
+                        setErrorMsg('Acceso denegado. Es posible que tus reglas de Firestore no permitan lectura pública o que el appId sea incorrecto.');
+                    } else {
+                        setErrorMsg(`Error de conexión: ${err.message}`);
+                    }
                 });
 
                 return () => unsub();
-            }, [user, db, appId]);
+            }, [user, db, appId, isConfigured]);
 
             // --- 3. SAVE DATA HELPER ---
             const saveToCloud = async (newMatrix, newReg, newEdits) => {
-                if (role !== 'admin') return; // Security Guard
+                if (role !== 'admin' || !db) return;
                 try {
-                    // FIX: Added 'main' segment to ensure even number of path segments
                     const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'instrument_app', 'main');
                     await setDoc(docRef, {
                         matrix: JSON.stringify(newMatrix || matrixData),
@@ -507,6 +558,7 @@
 
             // Handlers
             const handleLogin = async (selectedMode, credentials) => {
+                if(!auth) return;
                 setLoadingAuth(true);
                 try {
                     if (selectedMode === 'view') {
@@ -527,16 +579,14 @@
             };
 
             const handleLogout = () => {
-                signOut(auth);
+                if(auth) signOut(auth);
                 setUser(null);
                 setMatrixData([]); // Clear local data on logout
                 setRegData([]);
             };
 
             const performClearData = () => {
-                // Clear Cloud
                 saveToCloud([], [], {});
-                // Clear Local UI (redundant but snappy)
                 setMatrixData([]); setRegData([]); setManualEdits({}); setUploadStats(null); setFilter("TODOS"); setExpandedRows({});
                 if (fileInputRef.current) fileInputRef.current.value = "";
                 if (regInputRef.current) regInputRef.current.value = "";
@@ -605,7 +655,7 @@
                 });
             }, [matrixData, hideDeleted]);
 
-            // STATS CALCS (Idéntico al original)
+            // STATS CALCS
             const systemsStats = useMemo(() => {
                 const grouped = {};
                 filteredMatrixData.forEach(item => {
@@ -654,7 +704,6 @@
                 });
             }, [regData]);
 
-            // --- ESTADÍSTICAS ---
             const totalDocsScope = useMemo(() => {
                 return matrixData.reduce((acc, item) => {
                     const est1 = cleanStr(item.estado1).toUpperCase();
@@ -754,7 +803,6 @@
                     const del = lines[0].includes(';') ? ';' : ','; 
                     const headers = parseCSVLine(lines[0], del).map(h => h.toUpperCase());
                     
-                    // (Same parsing logic as original)
                     const idx = {
                         tag: headers.findIndex(h => h === 'TAG'), spec: headers.findIndex(h => h.includes('ESPECIALIDAD') || h === 'ESP'), desc: headers.findIndex(h => h.includes('DESC') && !h.includes('SIS')),
                         sis: headers.findIndex(h => h === 'SISTEMA' || h === 'SIS'), sisDesc: headers.findIndex(h => h.includes('DESC') && h.includes('SIS')), sub: headers.findIndex(h => h.includes('SUB') && !h.includes('DESC')),
@@ -774,7 +822,6 @@
                             });
                         } 
                     }); 
-                    // Diff calculation
                     let modCount = 0; let newCount = 0;
                     const currentMap = new Map(matrixData.map(d => [d.tag, d]));
                     newData.forEach(newItem => { const currentItem = currentMap.get(newItem.tag); if (!currentItem) newCount++; else if (newItem.skid !== currentItem.skid || newItem.almacen !== currentItem.almacen) modCount++; });
@@ -805,7 +852,6 @@
                     });
                     
                     setRegData(newData);
-                    // SAVE DIRECTLY TO CLOUD
                     saveToCloud(null, newData, null);
                     
                     setUploadStats({type:'Registro Instrumentos', total:newData.length});
@@ -818,8 +864,7 @@
             const confirmMatrixLoad = () => {
                 if (pendingData) {
                     setMatrixData(pendingData);
-                    // SAVE DIRECTLY TO CLOUD
-                    saveToCloud(pendingData, null, {}); // Reset edits on new matrix load? Usually yes, or keep them. Resetting for safety.
+                    saveToCloud(pendingData, null, {}); 
 
                     setUploadStats({type:'Matriz Actualizada', total: pendingData.length});
                     setManualEdits({}); 
@@ -858,7 +903,7 @@
 
             // --- RENDER LOGIC ---
             if (!user) {
-                return <LoginScreen onLogin={handleLogin} loading={loadingAuth} />;
+                return <LoginScreen onLogin={handleLogin} loading={loadingAuth} isConfigured={isConfigured} />;
             }
 
             return (
@@ -883,6 +928,17 @@
                             </div>
                             <button onClick={handleLogout} className="text-red-500 hover:bg-red-50 px-3 py-1 rounded text-sm flex items-center gap-2 font-medium transition-colors"><LogOut size={16}/> Salir</button>
                         </div>
+                        
+                        {/* ERROR MSG BANNER */}
+                        {errorMsg && (
+                             <div className="bg-red-50 border-l-4 border-red-500 p-4 mb-4 rounded shadow-sm flex items-start gap-3">
+                                 <AlertCircle className="text-red-500 shrink-0 mt-0.5" size={20}/>
+                                 <div>
+                                     <h3 className="text-red-800 font-bold text-sm">Error de Conexión</h3>
+                                     <p className="text-red-700 text-sm">{errorMsg}</p>
+                                 </div>
+                             </div>
+                        )}
 
                         <div className="flex flex-col xl:flex-row justify-between items-center bg-white p-6 rounded-lg shadow-sm border border-slate-200">
                             <div>
