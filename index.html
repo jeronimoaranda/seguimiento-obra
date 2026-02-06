@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Control de Instrumentación & Precom - Batería Petróleo</title>
+    <title>Control de Instrumentación & Precom - Batería Petróleo (Online)</title>
     
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
@@ -15,11 +15,14 @@
                 "react": "https://esm.sh/react@18.2.0",
                 "react-dom/client": "https://esm.sh/react-dom@18.2.0/client",
                 "recharts": "https://esm.sh/recharts@2.12.0?deps=react@18.2.0,react-dom@18.2.0",
-                "lucide-react": "https://esm.sh/lucide-react@0.330.0?deps=react@18.2.0,react-dom@18.2.0"
+                "lucide-react": "https://esm.sh/lucide-react@0.330.0?deps=react@18.2.0,react-dom@18.2.0",
+                "firebase/app": "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js",
+                "firebase/auth": "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js",
+                "firebase/firestore": "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js"
             }
         }
     </script>
-    <!-- FIX: Versión específica de Babel -->
+    <!-- Babel -->
     <script src="https://unpkg.com/@babel/standalone@7.23.9/babel.min.js"></script>
 
     <style>
@@ -33,6 +36,14 @@
         .tab-inactive { color: #64748b; font-weight: 500; }
         .tab-inactive:hover { color: #334155; }
         
+        /* Estilos condicionales para inputs deshabilitados (modo lectura) */
+        .input-edit:disabled, .select-edit:disabled {
+            background-color: #f1f5f9;
+            color: #94a3b8;
+            border-color: #e2e8f0;
+            cursor: not-allowed;
+        }
+
         .input-edit { border: 1px solid #e2e8f0; border-radius: 4px; padding: 2px 6px; width: 100%; font-size: 0.75rem; color: #334155; transition: all 0.2s; }
         .input-edit:focus { border-color: #3b82f6; outline: none; box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.1); background-color: #fff; }
         .select-edit { border: 1px solid #e2e8f0; border-radius: 4px; padding: 2px; font-size: 0.75rem; background-color: white; width: 100%; cursor: pointer; }
@@ -48,14 +59,18 @@
     
     <div id="root"></div>
 
-    <!-- FIX: Usamos solo 'react' en presets para evitar que Babel transpile imports a require() -->
     <script type="text/babel" data-type="module" data-presets="react">
         import React, { useState, useMemo, useRef, useEffect } from 'react';
         import { createRoot } from 'react-dom/client';
         import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, PieChart, Pie, Cell, ResponsiveContainer, Label, LabelList } from 'recharts';
-        import { AlertCircle, CheckCircle, Clock, Activity, Upload, Trash2, HardHat, Download, X, AlertTriangle, Target, Layers, FileSpreadsheet, LayoutDashboard, ChevronDown, ChevronRight, Boxes, PlayCircle, Wrench, Zap, Hammer, FileWarning, Package, Truck, ClipboardCheck, Edit3, Save, Eye, EyeOff, FileCheck, RefreshCw, CalendarDays, Search, FileText, MapPin, Box } from 'lucide-react';
+        import { AlertCircle, CheckCircle, Clock, Activity, Upload, Trash2, HardHat, Download, X, AlertTriangle, Target, Layers, FileSpreadsheet, LayoutDashboard, ChevronDown, ChevronRight, Boxes, PlayCircle, Wrench, Zap, Hammer, FileWarning, Package, Truck, ClipboardCheck, Edit3, Save, Eye, EyeOff, FileCheck, RefreshCw, CalendarDays, Search, FileText, MapPin, Box, LogIn, User, Shield, LogOut, Database } from 'lucide-react';
+        
+        // --- FIREBASE IMPORTS ---
+        import { initializeApp } from "firebase/app";
+        import { getAuth, signInWithCustomToken, signInAnonymously, onAuthStateChanged, signOut, signInWithEmailAndPassword, createUserWithEmailAndPassword } from "firebase/auth";
+        import { getFirestore, doc, setDoc, onSnapshot, collection } from "firebase/firestore";
 
-        // --- FUNCIONES DE LIMPIEZA AVANZADA ---
+        // --- FUNCIONES DE LIMPIEZA & UTILS ---
         const cleanStr = (str) => {
             if (!str) return "";
             return str.toString().trim();
@@ -80,7 +95,6 @@
             return ""; 
         };
 
-        // --- PARSER CSV ROBUSTO ---
         const parseCSVLine = (text, delimiter) => {
             const result = [];
             let current = '';
@@ -100,34 +114,20 @@
             return result.map(val => val.replace(/^"|"$/g, '').replace(/""/g, '"').trim());
         };
 
-        // --- DATOS INICIALES DEMO ---
-        const initialSystemData = [
-            { especialidad: "Instrumentacion (I)", tag: "TI-801B", descripcion: "Termometro", sistema: "011", descSistema: "Recepcion", subsistema: "001", descSubsistema: "Ingreso", skid: "ON", almacen: "EN OBRA", aCalibrar: "1", provision: "YPF", cantRegTot: "2", cantRegReal: "2", estado1: "", estado2: "INST" },
-            { especialidad: "Instrumentacion (I)", tag: "C-LY107", descripcion: "Cable", sistema: "014", descSistema: "Tratamiento Agua", subsistema: "001", descSubsistema: "Skimmer", skid: "", almacen: "", aCalibrar: "0", provision: "", cantRegTot: "1", cantRegReal: "0", estado1: "", estado2: "" },
-            { especialidad: "Instrumentacion (I)", tag: "PI-003A", descripcion: "Manometro", sistema: "023", descSistema: "Control-F&G", subsistema: "001", descSubsistema: "F&G", skid: "OFF", almacen: "ALM-A", aCalibrar: "1", provision: "", cantRegTot: "1", cantRegReal: "0", estado1: "", estado2: "" },
-            { especialidad: "Mecánica", tag: "V-101", descripcion: "Separador", sistema: "010", descSistema: "Separación", subsistema: "002", descSubsistema: "V-101", skid: "SK-V101", almacen: "", aCalibrar: "0", provision: "", cantRegTot: "5", cantRegReal: "3", estado1: "", estado2: "" },
-            { especialidad: "Instrumentacion (I)", tag: "TAG-DEL", descripcion: "Eliminado", sistema: "000", descSistema: "Test", subsistema: "000", descSubsistema: "Test", skid: "", almacen: "", aCalibrar: "0", provision: "", cantRegTot: "10", cantRegReal: "0", estado1: "Eliminado", estado2: "" },
-        ];
-        
-        const initialRegData = [
-             { skid: "ON", ubicacion: "ALMACEN", tag: "AIT-107", lab: "CIS", fCalib: "2026-01-19", estadoReg: "PRESENTADO", fGen: "2026-01-20", fPres: "2026-01-23", fDev: "", ubicReg: "INSPECCIÓN", montado: "SIN MONTAR", provision: "YPF" },
-             { skid: "ON", ubicacion: "LABORATORIO", tag: "BDV-102C", lab: "", fCalib: "2025-11-29", estadoReg: "FIRMADO", fGen: "2025-11-29", fPres: "2025-11-29", fDev: "2025-11-29", ubicReg: "PRECOM", montado: "MONTADO", provision: "PECOM" },
-        ];
-
         const COLORS = { blue: "#3b82f6", green: "#10b981", orange: "#f97316", red: "#ef4444", yellow: "#eab308", purple: "#a855f7", indigo: "#6366f1", gray: "#64748b", teal: "#14b8a6", pink: "#db2777", cyan: "#06b6d4" };
         const COLORS_LIST = Object.values(COLORS);
 
-        // --- COMPONENTES UI ---
+        // --- COMPONENTES UI (MODALES) ---
         const ConfirmModal = ({ isOpen, onClose, onConfirm }) => {
             if (!isOpen) return null;
             return (
                 <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[60] p-4">
                     <div className="bg-white rounded-lg shadow-xl max-w-sm w-full p-6">
-                        <div className="flex items-center gap-3 mb-4 text-red-600"><AlertTriangle size={24} /><h3 className="text-lg font-bold">¿Limpiar Todo?</h3></div>
-                        <p className="text-gray-600 mb-6 text-sm">Se perderán todos los datos cargados.</p>
+                        <div className="flex items-center gap-3 mb-4 text-red-600"><AlertTriangle size={24} /><h3 className="text-lg font-bold">¿Limpiar Base de Datos?</h3></div>
+                        <p className="text-gray-600 mb-6 text-sm">Se borrarán todos los datos para TODOS los usuarios.</p>
                         <div className="flex justify-end gap-3">
                             <button onClick={onClose} className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded text-sm">Cancelar</button>
-                            <button onClick={onConfirm} className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded text-sm">Aceptar</button>
+                            <button onClick={onConfirm} className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded text-sm">Borrar Nube</button>
                         </div>
                     </div>
                 </div>
@@ -139,7 +139,7 @@
             return (
                 <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[60] p-4">
                     <div className="bg-white rounded-lg shadow-xl max-w-sm w-full p-6 animate-enter">
-                        <div className="flex items-center gap-3 mb-4 text-green-600"><FileCheck size={24} /><h3 className="text-lg font-bold">Carga Exitosa</h3></div>
+                        <div className="flex items-center gap-3 mb-4 text-green-600"><FileCheck size={24} /><h3 className="text-lg font-bold">Operación Exitosa</h3></div>
                         <p className="text-gray-600 mb-6 text-sm">{message}</p>
                         <div className="flex justify-end gap-3">
                             <button onClick={onClose} className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded text-sm">Aceptar</button>
@@ -154,8 +154,8 @@
             return (
                 <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[60] p-4">
                     <div className="bg-white rounded-lg shadow-xl max-w-md w-full p-6 animate-enter">
-                        <div className="flex items-center gap-3 mb-4 text-blue-600"><RefreshCw size={24} /><h3 className="text-lg font-bold">Confirmar Actualización</h3></div>
-                        <p className="text-gray-600 mb-4 text-sm">Se ha analizado el archivo. Resumen de cambios:</p>
+                        <div className="flex items-center gap-3 mb-4 text-blue-600"><RefreshCw size={24} /><h3 className="text-lg font-bold">Sincronizar con Nube</h3></div>
+                        <p className="text-gray-600 mb-4 text-sm">Resumen de cambios a subir:</p>
                         <div className="bg-slate-50 p-4 rounded border border-slate-200 mb-6 text-sm">
                             <div className="flex justify-between mb-2"><span>Total Registros:</span> <strong>{changes.total}</strong></div>
                             <div className="flex justify-between mb-2 text-green-600"><span>Nuevos:</span> <strong>+{changes.newItems}</strong></div>
@@ -163,7 +163,86 @@
                         </div>
                         <div className="flex justify-end gap-3">
                             <button onClick={onClose} className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded text-sm">Cancelar</button>
-                            <button onClick={onConfirm} className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded text-sm flex items-center gap-2"><FileCheck size={16}/> Aprobar Carga</button>
+                            <button onClick={onConfirm} className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded text-sm flex items-center gap-2"><Upload size={16}/> Subir a DB</button>
+                        </div>
+                    </div>
+                </div>
+            );
+        };
+
+        // --- LOGIN COMPONENT ---
+        const LoginScreen = ({ onLogin, loading }) => {
+            const [mode, setMode] = useState('view'); // 'view' or 'admin'
+            const [email, setEmail] = useState('');
+            const [password, setPassword] = useState('');
+            const [error, setError] = useState('');
+            const [isRegistering, setIsRegistering] = useState(false);
+
+            const handleSubmit = (e) => {
+                e.preventDefault();
+                setError('');
+                if (mode === 'view') {
+                    onLogin('view');
+                } else {
+                    if (!email || !password) {
+                        setError('Por favor complete todos los campos');
+                        return;
+                    }
+                    onLogin('admin', { email, password, isRegistering });
+                }
+            };
+
+            return (
+                <div className="min-h-screen bg-slate-100 flex items-center justify-center p-4">
+                    <div className="bg-white rounded-xl shadow-2xl overflow-hidden w-full max-w-md flex flex-col">
+                        <div className="bg-blue-600 p-6 text-white text-center">
+                            <h1 className="text-2xl font-bold mb-2">Control de Obra</h1>
+                            <p className="text-blue-100 text-sm">Plataforma Colaborativa en Tiempo Real</p>
+                        </div>
+                        
+                        <div className="p-8">
+                            <div className="flex gap-4 mb-6 border-b border-slate-200 pb-2">
+                                <button 
+                                    onClick={() => { setMode('view'); setError(''); }} 
+                                    className={`flex-1 pb-2 text-sm font-semibold transition-colors flex justify-center items-center gap-2 ${mode === 'view' ? 'text-blue-600 border-b-2 border-blue-600' : 'text-slate-400'}`}
+                                >
+                                    <Eye size={18}/> Solo Lectura
+                                </button>
+                                <button 
+                                    onClick={() => { setMode('admin'); setError(''); }} 
+                                    className={`flex-1 pb-2 text-sm font-semibold transition-colors flex justify-center items-center gap-2 ${mode === 'admin' ? 'text-blue-600 border-b-2 border-blue-600' : 'text-slate-400'}`}
+                                >
+                                    <Shield size={18}/> Admin
+                                </button>
+                            </div>
+
+                            <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+                                {mode === 'admin' && (
+                                    <>
+                                        <div>
+                                            <label className="text-xs font-bold text-slate-500 uppercase">Email</label>
+                                            <input type="email" value={email} onChange={e=>setEmail(e.target.value)} className="w-full p-2 border border-slate-300 rounded focus:border-blue-500 outline-none" placeholder="admin@obra.com" />
+                                        </div>
+                                        <div>
+                                            <label className="text-xs font-bold text-slate-500 uppercase">Contraseña</label>
+                                            <input type="password" value={password} onChange={e=>setPassword(e.target.value)} className="w-full p-2 border border-slate-300 rounded focus:border-blue-500 outline-none" placeholder="••••••••" />
+                                        </div>
+                                        <div className="flex items-center gap-2 mt-1">
+                                            <input type="checkbox" id="regCheck" checked={isRegistering} onChange={e => setIsRegistering(e.target.checked)} className="rounded text-blue-600"/>
+                                            <label htmlFor="regCheck" className="text-xs text-slate-500 select-none">Crear cuenta nueva si no existe</label>
+                                        </div>
+                                    </>
+                                )}
+
+                                {error && <div className="bg-red-50 text-red-600 p-3 rounded text-sm flex items-center gap-2"><AlertCircle size={16}/> {error}</div>}
+
+                                <button disabled={loading} type="submit" className="mt-4 bg-blue-600 hover:bg-blue-700 text-white py-2 rounded font-bold shadow-lg transform active:scale-95 transition-all flex justify-center items-center gap-2">
+                                    {loading ? <RefreshCw className="animate-spin"/> : <LogIn size={18} />}
+                                    {mode === 'view' ? 'Ingresar como Invitado' : (isRegistering ? 'Registrar y Entrar' : 'Iniciar Sesión')}
+                                </button>
+                            </form>
+                            
+                            {mode === 'view' && <p className="text-xs text-center text-slate-400 mt-4">Podrás ver los gráficos y tablas, pero no editar datos ni cargar archivos.</p>}
                         </div>
                     </div>
                 </div>
@@ -175,7 +254,6 @@
                 <div className="flex justify-between items-center z-10 relative">
                     <div>
                         <p className="text-slate-400 text-xs font-bold uppercase tracking-wider">{title}</p>
-                        {/* Se reduce el tamaño del texto principal: text-3xl a text-xl para un diseño más compacto (75% aprox) */}
                         <h3 className={`${compact ? 'text-lg' : 'text-xl'} font-bold text-slate-700 flex items-baseline gap-2 mt-1`}>
                             {value}
                             {percentage && <span className="text-xs font-normal text-slate-400">({percentage}%)</span>}
@@ -199,7 +277,7 @@
         };
 
         // --- COMPONENTES TABLA ---
-        const TagEditRow = ({ tagItem, onEdit, skidOptions, almacenOptions }) => {
+        const TagEditRow = ({ tagItem, onEdit, skidOptions, almacenOptions, isReadOnly }) => {
             let rowColor = "hover:bg-slate-50";
             if (tagItem.calculatedStatus === "INSTALADO") rowColor = "bg-green-50/60";
             else if (tagItem.calculatedStatus === "EN PROCESO") rowColor = "bg-yellow-50/60";
@@ -210,28 +288,28 @@
                     <td className="px-4 py-2 text-slate-500 text-[10px] truncate max-w-[150px]" title={tagItem.desc}>{tagItem.desc}</td>
                     
                     <td className="px-2 py-1">
-                        <select className="select-edit" value={tagItem.skid} onChange={(e) => onEdit(tagItem.tag, 'skid', e.target.value)}>
+                        <select disabled={isReadOnly} className="select-edit" value={tagItem.skid} onChange={(e) => onEdit(tagItem.tag, 'skid', e.target.value)}>
                             <option value="">-</option>
                             {skidOptions.map(opt => <option key={opt} value={opt}>{opt}</option>)}
                         </select>
                     </td>
                     
                     <td className="px-2 py-1">
-                        <select className="select-edit" value={tagItem.almacen} onChange={(e) => onEdit(tagItem.tag, 'almacen', e.target.value)}>
+                        <select disabled={isReadOnly} className="select-edit" value={tagItem.almacen} onChange={(e) => onEdit(tagItem.tag, 'almacen', e.target.value)}>
                             <option value="">-</option>
                             {almacenOptions.map(opt => <option key={opt} value={opt}>{opt}</option>)}
                         </select>
                     </td>
                     
                     <td className="px-2 py-1 text-center w-20">
-                        <select className="select-edit text-center" value={tagItem.aCalibrar} onChange={(e) => onEdit(tagItem.tag, 'aCalibrar', e.target.value)}>
+                        <select disabled={isReadOnly} className="select-edit text-center" value={tagItem.aCalibrar} onChange={(e) => onEdit(tagItem.tag, 'aCalibrar', e.target.value)}>
                             <option value="0">NO</option>
                             <option value="1">SI</option>
                         </select>
                     </td>
                     
-                    <td className="px-2 py-1 w-16"><input type="number" className="input-edit text-center" value={tagItem.cantRegTot} onChange={(e) => onEdit(tagItem.tag, 'cantRegTot', e.target.value)} placeholder="0"/></td>
-                    <td className="px-2 py-1 w-16"><input type="number" className="input-edit text-center" value={tagItem.cantRegReal} onChange={(e) => onEdit(tagItem.tag, 'cantRegReal', e.target.value)} placeholder="0"/></td>
+                    <td className="px-2 py-1 w-16"><input disabled={isReadOnly} type="number" className="input-edit text-center" value={tagItem.cantRegTot} onChange={(e) => onEdit(tagItem.tag, 'cantRegTot', e.target.value)} placeholder="0"/></td>
+                    <td className="px-2 py-1 w-16"><input disabled={isReadOnly} type="number" className="input-edit text-center" value={tagItem.cantRegReal} onChange={(e) => onEdit(tagItem.tag, 'cantRegReal', e.target.value)} placeholder="0"/></td>
 
                     <td className="px-2 py-1 text-center w-32">
                          <span className={`text-[10px] font-bold px-2 py-1 rounded border ${tagItem.calculatedStatus === 'INSTALADO' ? 'text-green-700 bg-green-100 border-green-200' : tagItem.calculatedStatus === 'EN PROCESO' ? 'text-yellow-700 bg-yellow-100 border-yellow-200' : 'text-slate-400 bg-slate-100 border-slate-200'}`}>
@@ -242,7 +320,7 @@
             );
         };
 
-        const SpecialtyGroup = ({ specialtyName, tags, onEdit, skidOptions, almacenOptions }) => {
+        const SpecialtyGroup = ({ specialtyName, tags, onEdit, skidOptions, almacenOptions, isReadOnly }) => {
             const [isExpanded, setIsExpanded] = useState(false);
             const total = tags.length;
             const mounted = tags.filter(t => t.calculatedStatus === "INSTALADO").length;
@@ -276,7 +354,7 @@
                                         <th className="px-2 py-2 font-semibold text-center w-32">Estado</th>
                                     </tr>
                                 </thead>
-                                <tbody>{tags.map((tagItem) => <TagEditRow key={tagItem.tag} tagItem={tagItem} onEdit={onEdit} skidOptions={skidOptions} almacenOptions={almacenOptions} />)}</tbody>
+                                <tbody>{tags.map((tagItem) => <TagEditRow key={tagItem.tag} tagItem={tagItem} onEdit={onEdit} skidOptions={skidOptions} almacenOptions={almacenOptions} isReadOnly={isReadOnly} />)}</tbody>
                             </table>
                         </div>
                     )}
@@ -284,7 +362,7 @@
             );
         };
 
-        const ExpandableRow = ({ sys, isExpanded, onToggle, onEdit, skidOptions, almacenOptions }) => {
+        const ExpandableRow = ({ sys, isExpanded, onToggle, onEdit, skidOptions, almacenOptions, isReadOnly }) => {
             const groupedTags = useMemo(() => {
                 const groups = {};
                 sys.tags.forEach(t => { const spec = t.specialty || "Sin Especialidad"; if (!groups[spec]) groups[spec] = []; groups[spec].push(t); });
@@ -301,7 +379,7 @@
                         <td className="px-6 py-4"><div className="flex items-center gap-3"><span className="text-xs font-bold w-8 text-right">{sys.percent}%</span><ProgressBar current={sys.mountedTags} total={sys.totalTags} color={parseFloat(sys.percent) === 100 ? 'bg-green-600' : parseFloat(sys.percent) > 50 ? 'bg-blue-600' : 'bg-orange-400'} /></div></td>
                     </tr>
                     {isExpanded && (
-                        <tr><td colSpan="5" className="p-4 bg-slate-50 border-b border-slate-200 shadow-inner"><div className="pl-6"><h4 className="text-xs font-bold text-slate-400 uppercase mb-3 flex items-center gap-2 tracking-wider"><Boxes size={14}/> Detalle por Especialidad (ABM)</h4>{Object.keys(groupedTags).sort().map(specName => (<SpecialtyGroup key={specName} specialtyName={specName} tags={groupedTags[specName]} onEdit={onEdit} skidOptions={skidOptions} almacenOptions={almacenOptions}/>))}</div></td></tr>
+                        <tr><td colSpan="5" className="p-4 bg-slate-50 border-b border-slate-200 shadow-inner"><div className="pl-6"><h4 className="text-xs font-bold text-slate-400 uppercase mb-3 flex items-center gap-2 tracking-wider"><Boxes size={14}/> Detalle por Especialidad (ABM)</h4>{Object.keys(groupedTags).sort().map(specName => (<SpecialtyGroup key={specName} specialtyName={specName} tags={groupedTags[specName]} onEdit={onEdit} skidOptions={skidOptions} almacenOptions={almacenOptions} isReadOnly={isReadOnly} />))}</div></td></tr>
                     )}
                 </>
             );
@@ -309,13 +387,21 @@
 
         // --- APP PRINCIPAL ---
         function InstrumentDashboard() {
-            const [matrixData, setMatrixData] = useState(initialSystemData);
-            const [regData, setRegData] = useState(initialRegData); 
+            // Firebase State
+            const [user, setUser] = useState(null);
+            const [role, setRole] = useState('viewer'); // 'viewer' | 'admin'
+            const [loadingAuth, setLoadingAuth] = useState(true);
+            const [loadingData, setLoadingData] = useState(false);
+
+            // Data State
+            const [matrixData, setMatrixData] = useState([]);
+            const [regData, setRegData] = useState([]); 
             const [activeTab, setActiveTab] = useState("dashboard"); 
             const [filter, setFilter] = useState("TODOS");
             const [expandedRows, setExpandedRows] = useState({}); 
             const [manualEdits, setManualEdits] = useState({});
             
+            // UI Refs & State
             const fileInputRef = useRef(null);
             const regInputRef = useRef(null); 
             const [uploadStats, setUploadStats] = useState(null);
@@ -324,12 +410,89 @@
             const [isApprovalModalOpen, setIsApprovalModalOpen] = useState(false);
             const [pendingData, setPendingData] = useState(null);
             const [changeStats, setChangeStats] = useState(null);
-
             const [hideDeleted, setHideDeleted] = useState(true); 
 
             const [skidOptions, setSkidOptions] = useState([]);
             const [almacenOptions, setAlmacenOptions] = useState([]);
 
+            // Firebase Globals
+            const firebaseConfig = JSON.parse(__firebase_config);
+            const app = useMemo(() => initializeApp(firebaseConfig), []);
+            const auth = useMemo(() => getAuth(app), [app]);
+            const db = useMemo(() => getFirestore(app), [app]);
+            const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+
+            // --- 1. INITIALIZE FIREBASE AUTH ---
+            useEffect(() => {
+                const initAuth = async () => {
+                    if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+                        await signInWithCustomToken(auth, __initial_auth_token);
+                    }
+                    // No automatic anonymous sign in, wait for user interaction
+                    setLoadingAuth(false);
+                };
+                initAuth();
+
+                const unsubscribe = onAuthStateChanged(auth, (u) => {
+                    setUser(u);
+                    setLoadingAuth(false);
+                    // Determine Role strictly by authentication method or UID (Mock logic for demo)
+                    if (u) {
+                        if (u.isAnonymous) setRole('viewer');
+                        else setRole('admin'); // Email auth = Admin
+                    }
+                });
+                return () => unsubscribe();
+            }, [auth]);
+
+            // --- 2. FIRESTORE DATA SYNC ---
+            useEffect(() => {
+                if (!user) return;
+                setLoadingData(true);
+                
+                // Use a single document for atomic updates (simpler for this use case)
+                // FIX: Added 'main' segment to ensure even number of path segments (Collection/Doc/Col/Doc...)
+                const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'instrument_app', 'main');
+                
+                const unsub = onSnapshot(docRef, (snap) => {
+                    if (snap.exists()) {
+                        const data = snap.data();
+                        if (data.matrix) setMatrixData(JSON.parse(data.matrix));
+                        if (data.registry) setRegData(JSON.parse(data.registry));
+                        if (data.edits) setManualEdits(data.edits);
+                    } else {
+                        // DB empty?
+                        setMatrixData([]);
+                        setRegData([]);
+                    }
+                    setLoadingData(false);
+                }, (err) => {
+                    console.error("Error fetching data:", err);
+                    setLoadingData(false);
+                });
+
+                return () => unsub();
+            }, [user, db, appId]);
+
+            // --- 3. SAVE DATA HELPER ---
+            const saveToCloud = async (newMatrix, newReg, newEdits) => {
+                if (role !== 'admin') return; // Security Guard
+                try {
+                    // FIX: Added 'main' segment to ensure even number of path segments
+                    const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'instrument_app', 'main');
+                    await setDoc(docRef, {
+                        matrix: JSON.stringify(newMatrix || matrixData),
+                        registry: JSON.stringify(newReg || regData),
+                        edits: newEdits || manualEdits,
+                        lastUpdated: new Date().toISOString(),
+                        updatedBy: user.email || 'Admin'
+                    });
+                } catch (e) {
+                    alert("Error guardando en la nube: " + e.message);
+                }
+            };
+
+            // Options Calc
             useEffect(() => {
                 const uniqueSkids = new Set();
                 const uniqueAlmacenes = new Set();
@@ -343,7 +506,37 @@
             }, [matrixData]);
 
             // Handlers
+            const handleLogin = async (selectedMode, credentials) => {
+                setLoadingAuth(true);
+                try {
+                    if (selectedMode === 'view') {
+                        await signInAnonymously(auth);
+                    } else {
+                        const { email, password, isRegistering } = credentials;
+                        if (isRegistering) {
+                            await createUserWithEmailAndPassword(auth, email, password);
+                        } else {
+                            await signInWithEmailAndPassword(auth, email, password);
+                        }
+                    }
+                } catch (err) {
+                    alert("Error de autenticación: " + err.message);
+                } finally {
+                    setLoadingAuth(false);
+                }
+            };
+
+            const handleLogout = () => {
+                signOut(auth);
+                setUser(null);
+                setMatrixData([]); // Clear local data on logout
+                setRegData([]);
+            };
+
             const performClearData = () => {
+                // Clear Cloud
+                saveToCloud([], [], {});
+                // Clear Local UI (redundant but snappy)
                 setMatrixData([]); setRegData([]); setManualEdits({}); setUploadStats(null); setFilter("TODOS"); setExpandedRows({});
                 if (fileInputRef.current) fileInputRef.current.value = "";
                 if (regInputRef.current) regInputRef.current.value = "";
@@ -353,34 +546,46 @@
             const toggleRow = (id) => setExpandedRows(prev => ({...prev, [id]: !prev[id]}));
 
             const handleTagEdit = (tag, field, value) => {
-                setManualEdits(prev => {
-                    let newEdits = { ...prev[tag], [field]: value };
-                    if (field === 'cantRegReal') {
-                        const item = matrixData.find(d => d.tag === tag);
-                        const tot = safeParseInt(manualEdits[tag]?.cantRegTot !== undefined ? manualEdits[tag].cantRegTot : (item?.cantRegTot || 0));
-                        const real = safeParseInt(value);
-                        if (tot > 0 && real >= tot) { 
-                             newEdits.almacen = "EN OBRA";
-                        }
+                if (role !== 'admin') return;
+
+                const updatedEdits = { ...manualEdits };
+                
+                let newEditsForTag = { ...(updatedEdits[tag] || {}), [field]: value };
+                
+                // Logic Auto-Almacen
+                if (field === 'cantRegReal') {
+                    const item = matrixData.find(d => d.tag === tag);
+                    const tot = safeParseInt(newEditsForTag.cantRegTot !== undefined ? newEditsForTag.cantRegTot : (item?.cantRegTot || 0));
+                    const real = safeParseInt(value);
+                    if (tot > 0 && real >= tot) { 
+                         newEditsForTag.almacen = "EN OBRA";
                     }
-                    return { ...prev, [tag]: newEdits };
-                });
+                }
+                
+                updatedEdits[tag] = newEditsForTag;
+                
+                // Optimistic UI Update
+                setManualEdits(updatedEdits);
+                // Save to Cloud (Debounced idealmente, pero directo para simpleza)
+                saveToCloud(null, null, updatedEdits);
             };
             
             const handleRegEdit = (tag, field, value) => {
-                setRegData(prev => {
-                    return prev.map(item => {
-                        if(item.tag === tag) {
-                            let newState = item.estadoDoc;
-                            if (field === 'fDev' && value) newState = "FINALIZADO";
-                            else if (field === 'fPres' && value) newState = "EN INSPECCIÓN";
-                            else if (field === 'fGen' && value) newState = "EN LABORATORIO";
+                if (role !== 'admin') return;
 
-                            return { ...item, [field]: value, estadoDoc: newState };
-                        }
-                        return item;
-                    });
+                const newRegData = regData.map(item => {
+                    if(item.tag === tag) {
+                        let newState = item.estadoDoc;
+                        if (field === 'fDev' && value) newState = "FINALIZADO";
+                        else if (field === 'fPres' && value) newState = "EN INSPECCIÓN";
+                        else if (field === 'fGen' && value) newState = "EN LABORATORIO";
+                        return { ...item, [field]: value, estadoDoc: newState };
+                    }
+                    return item;
                 });
+
+                setRegData(newRegData);
+                saveToCloud(null, newRegData, null);
             };
 
             const calculateState = (item, edit) => {
@@ -391,7 +596,7 @@
                 return "PENDIENTE";
             };
 
-            // Filtrado visual para la tabla
+            // Filtrado visual
             const filteredMatrixData = useMemo(() => {
                 if (!hideDeleted) return matrixData;
                 return matrixData.filter(item => {
@@ -400,6 +605,7 @@
                 });
             }, [matrixData, hideDeleted]);
 
+            // STATS CALCS (Idéntico al original)
             const systemsStats = useMemo(() => {
                 const grouped = {};
                 filteredMatrixData.forEach(item => {
@@ -436,42 +642,23 @@
                      if (item.fDev && item.fDev.trim() !== "") status = "FINALIZADO";
                      else if (item.fPres && item.fPres.trim() !== "") status = "EN INSPECCIÓN";
                      else if (item.fGen && item.fGen.trim() !== "") status = "EN LABORATORIO";
-                     
-                     // MODIFICADO: Usar columna "UBICACIÓN DE REGISTRO" (ubicReg) para el estado físico
                      const estadoRegFisico = (item.ubicReg && item.ubicReg.trim() !== "") ? item.ubicReg : "PENDIENTE";
-                     
-                     // Ubicación Física Real (Columna 2 del CSV)
                      const ubicacionFisicaReal = (item.ubicacion && item.ubicacion.trim() !== "") ? item.ubicacion : "Sin Dato";
-
-                     // Provisión
                      const provision = (item.provision && item.provision.trim() !== "") ? item.provision : "Sin Dato";
-
-                     // Skid status clean
                      const skidStatus = (item.skid && item.skid.trim() !== "") ? item.skid : "Sin Dato";
 
                      return {
-                         tag: item.tag,
-                         ubicacionFisica: ubicacionFisicaReal, // Para gráfico nuevo
-                         ubicacionRegistro: estadoRegFisico, // Para gráfico de estado
-                         proveedor: item.lab || "Sin Prov.", 
-                         estadoDoc: status, 
-                         fechaGen: item.fGen,
-                         fechaPres: item.fPres,
-                         fechaDev: item.fDev,
-                         montado: item.montado,
-                         provision: provision,
-                         skid: skidStatus
+                         tag: item.tag, ubicacionFisica: ubicacionFisicaReal, ubicacionRegistro: estadoRegFisico, proveedor: item.lab || "Sin Prov.", 
+                         estadoDoc: status, fechaGen: item.fGen, fechaPres: item.fPres, fechaDev: item.fDev, montado: item.montado, provision: provision, skid: skidStatus
                      };
                 });
             }, [regData]);
 
-            // --- ESTADÍSTICAS GLOBALES ROBUSTAS ---
-            
+            // --- ESTADÍSTICAS ---
             const totalDocsScope = useMemo(() => {
                 return matrixData.reduce((acc, item) => {
                     const est1 = cleanStr(item.estado1).toUpperCase();
                     if (est1.includes("ELIMINA")) return acc;
-                    
                     const edit = manualEdits[item.tag];
                     const val = safeParseInt(edit?.cantRegTot !== undefined ? edit.cantRegTot : item.cantRegTot);
                     return acc + val;
@@ -480,47 +667,33 @@
 
             const globalProgress = useMemo(() => {
                 let sumTot = 0; let sumReal = 0;
-                
                 matrixData.forEach(item => {
                     const est1 = cleanStr(item.estado1).toUpperCase();
                     if (est1.includes("ELIMINA")) return;
-
                     const tag = item.tag?.trim();
                     const edit = manualEdits[tag];
-                    
                     const valTot = safeParseInt(edit?.cantRegTot !== undefined ? edit.cantRegTot : item.cantRegTot);
                     const valReal = safeParseInt(edit?.cantRegReal !== undefined ? edit.cantRegReal : item.cantRegReal);
-                    
                     sumTot += valTot;
                     sumReal += valReal;
                 });
-                
                 return sumTot === 0 ? "0.0000" : ((sumReal / sumTot) * 100).toFixed(4);
             }, [matrixData, manualEdits]);
 
-            // NUEVO CÁLCULO: Datos para gráfico apilado (Ubicación vs Provisión)
             const physicalLocationStats = useMemo(() => {
                 const stats = {};
                 const provisions = new Set();
-
                 flatData.forEach(item => {
                     const loc = item.ubicacionFisica;
                     const prov = item.provision;
                     provisions.add(prov);
-
                     if (!stats[loc]) stats[loc] = { name: loc };
                     stats[loc][prov] = (stats[loc][prov] || 0) + 1;
                 });
-
-                // Ordenar para mejor visualización
                 const sortedData = Object.values(stats).sort((a, b) => a.name.localeCompare(b.name));
-                return {
-                    data: sortedData,
-                    keys: Array.from(provisions).sort()
-                };
+                return { data: sortedData, keys: Array.from(provisions).sort() };
             }, [flatData]);
 
-            // NUEVO CÁLCULO: Conteo de Skid ON/OFF
             const skidCounts = useMemo(() => {
                 const counts = { ON: 0, OFF: 0 };
                 flatData.forEach(d => {
@@ -531,7 +704,6 @@
                 return counts;
             }, [flatData]);
 
-            // NUEVO CÁLCULO: Laboratorios Únicos para el desplegable
             const uniqueLabs = useMemo(() => {
                 const labs = new Set();
                 regData.forEach(d => {
@@ -540,7 +712,6 @@
                 return Array.from(labs).sort();
             }, [regData]);
 
-            // NUEVO CÁLCULO: Avance por Especialidad (SUMANDO REGISTROS, NO TAGS)
             const specialtyStats = useMemo(() => {
                 const stats = {
                     "I": { label: "Instrumentación (I)", total: 0, completed: 0, color: "#3b82f6", icon: Activity },
@@ -549,16 +720,11 @@
                     "M": { label: "Mecánica (M)", total: 0, completed: 0, color: "#64748b", icon: Wrench },
                     "C": { label: "Civil (C)", total: 0, completed: 0, color: "#f97316", icon: Hammer },
                 };
-
-                // Usamos matrixData y filtramos manualmente para asegurar que no se incluyan eliminados
-                // pero tampoco dependamos de la vista filtrada actual (para que el KPI sea siempre real)
                 matrixData.forEach(item => {
                     const est1 = (item.estado1 || "").toUpperCase();
                     if (est1.includes("ELIMINA")) return;
-
                     const spec = (item.especialidad || "").toUpperCase();
                     let key = null;
-                    // Lógica simple de coincidencia
                     if (spec.includes("INSTRUMENT") || spec.includes("(I)")) key = "I";
                     else if (spec.includes("ELECTRIC") || spec.includes("(E)")) key = "E";
                     else if (spec.includes("PIPING") || spec.includes("(P)")) key = "P";
@@ -569,91 +735,49 @@
                         const edit = manualEdits[item.tag];
                         const valTot = safeParseInt(edit?.cantRegTot !== undefined ? edit.cantRegTot : item.cantRegTot);
                         const valReal = safeParseInt(edit?.cantRegReal !== undefined ? edit.cantRegReal : item.cantRegReal);
-                        
-                        // SUMA DE REGISTROS (No conteo de tags)
                         stats[key].total += valTot;
                         stats[key].completed += valReal;
                     }
                 });
-
                 return Object.values(stats);
             }, [matrixData, manualEdits]);
 
-            // --- CARGA DE ARCHIVOS CSV (REESCRITA PARA MAXIMA COMPATIBILIDAD CON COMILLAS) ---
+            // --- CARGA DE ARCHIVOS ---
             const handleMatrixUpload = (e) => { 
                 const file = e.target.files[0]; 
                 if(!file) return; 
                 const reader = new FileReader(); 
                 reader.onload = (ev) => { 
-                    // Paso 1: Normalizar saltos de linea (eliminar \r)
                     const rawText = ev.target.result.replace(/\r/g, '');
                     const lines = rawText.split('\n').filter(l => l.trim().length > 0);
-                    
                     const newData = []; 
                     const del = lines[0].includes(';') ? ';' : ','; 
                     const headers = parseCSVLine(lines[0], del).map(h => h.toUpperCase());
                     
+                    // (Same parsing logic as original)
                     const idx = {
-                        tag: headers.findIndex(h => h === 'TAG'),
-                        spec: headers.findIndex(h => h.includes('ESPECIALIDAD') || h === 'ESP'),
-                        desc: headers.findIndex(h => h.includes('DESC') && !h.includes('SIS')),
-                        sis: headers.findIndex(h => h === 'SISTEMA' || h === 'SIS'),
-                        sisDesc: headers.findIndex(h => h.includes('DESC') && h.includes('SIS')),
-                        sub: headers.findIndex(h => h.includes('SUB') && !h.includes('DESC')),
-                        subDesc: headers.findIndex(h => h.includes('DESC') && h.includes('SUB')),
-                        skid: headers.findIndex(h => h === 'SKID'),
-                        alm: headers.findIndex(h => h === 'ALMACEN' || h === 'ALM'),
-                        calib: headers.findIndex(h => h.includes('CALIBRAR')),
-                        prov: headers.findIndex(h => h.includes('PROVISION')),
-                        cTot: headers.indexOf('CANTREGTOT') !== -1 ? headers.indexOf('CANTREGTOT') : headers.findIndex(h => h.includes('CANTREG') && h.includes('TOT')),
-                        cReal: headers.indexOf('CANTREGREALIZADOS') !== -1 ? headers.indexOf('CANTREGREALIZADOS') : headers.findIndex(h => h.includes('CANTREG') && h.includes('REAL')),
-                        est1: headers.indexOf('ESTADO_1') !== -1 ? headers.indexOf('ESTADO_1') : headers.findIndex(h => h.includes('ESTADO_1')),
-                        est2: headers.indexOf('ESTADO_2') !== -1 ? headers.indexOf('ESTADO_2') : headers.findIndex(h => h.includes('ESTADO_2'))
+                        tag: headers.findIndex(h => h === 'TAG'), spec: headers.findIndex(h => h.includes('ESPECIALIDAD') || h === 'ESP'), desc: headers.findIndex(h => h.includes('DESC') && !h.includes('SIS')),
+                        sis: headers.findIndex(h => h === 'SISTEMA' || h === 'SIS'), sisDesc: headers.findIndex(h => h.includes('DESC') && h.includes('SIS')), sub: headers.findIndex(h => h.includes('SUB') && !h.includes('DESC')),
+                        subDesc: headers.findIndex(h => h.includes('DESC') && h.includes('SUB')), skid: headers.findIndex(h => h === 'SKID'), alm: headers.findIndex(h => h === 'ALMACEN' || h === 'ALM'),
+                        calib: headers.findIndex(h => h.includes('CALIBRAR')), prov: headers.findIndex(h => h.includes('PROVISION')), cTot: headers.indexOf('CANTREGTOT') !== -1 ? headers.indexOf('CANTREGTOT') : headers.findIndex(h => h.includes('CANTREG') && h.includes('TOT')),
+                        cReal: headers.indexOf('CANTREGREALIZADOS') !== -1 ? headers.indexOf('CANTREGREALIZADOS') : headers.findIndex(h => h.includes('CANTREG') && h.includes('REAL')), est1: headers.indexOf('ESTADO_1') !== -1 ? headers.indexOf('ESTADO_1') : headers.findIndex(h => h.includes('ESTADO_1')), est2: headers.indexOf('ESTADO_2') !== -1 ? headers.indexOf('ESTADO_2') : headers.findIndex(h => h.includes('ESTADO_2'))
                     };
-
                     lines.forEach((r, i) => { 
                         if (i === 0) return; 
                         const c = parseCSVLine(r, del);
                         const tagVal = cleanStr(c[idx.tag]);
-                        
                         if(tagVal && tagVal.toUpperCase() !== "TAG" && !tagVal.toUpperCase().includes("DESCRIPCION")) {
                             newData.push({
-                                especialidad: cleanStr(c[idx.spec]),
-                                tag: tagVal,
-                                descripcion: cleanStr(c[idx.desc]),
-                                sistema: cleanStr(c[idx.sis]),
-                                descSistema: cleanStr(c[idx.sisDesc]),
-                                subsistema: cleanStr(c[idx.sub]),
-                                descSubsistema: cleanStr(c[idx.subDesc]),
-                                skid: cleanStr(c[idx.skid]),
-                                almacen: cleanStr(c[idx.alm]),
-                                aCalibrar: cleanStr(c[idx.calib]),
-                                provision: cleanStr(c[idx.prov]),
-                                cantRegTot: cleanStr(c[idx.cTot]) || "0",
-                                cantRegReal: cleanStr(c[idx.cReal]) || "0",
-                                estado1: cleanStr(c[idx.est1]),
-                                estado2: cleanStr(c[idx.est2])
+                                especialidad: cleanStr(c[idx.spec]), tag: tagVal, descripcion: cleanStr(c[idx.desc]), sistema: cleanStr(c[idx.sis]), descSistema: cleanStr(c[idx.sisDesc]),
+                                subsistema: cleanStr(c[idx.sub]), descSubsistema: cleanStr(c[idx.subDesc]), skid: cleanStr(c[idx.skid]), almacen: cleanStr(c[idx.alm]),
+                                aCalibrar: cleanStr(c[idx.calib]), provision: cleanStr(c[idx.prov]), cantRegTot: cleanStr(c[idx.cTot]) || "0", cantRegReal: cleanStr(c[idx.cReal]) || "0", estado1: cleanStr(c[idx.est1]), estado2: cleanStr(c[idx.est2])
                             });
                         } 
                     }); 
-
-                    let modCount = 0;
-                    let newCount = 0;
+                    // Diff calculation
+                    let modCount = 0; let newCount = 0;
                     const currentMap = new Map(matrixData.map(d => [d.tag, d]));
-                    newData.forEach(newItem => {
-                        const currentItem = currentMap.get(newItem.tag);
-                        if (!currentItem) {
-                            newCount++;
-                        } else {
-                            if (newItem.skid !== currentItem.skid || 
-                                newItem.almacen !== currentItem.almacen || 
-                                newItem.cantRegReal !== currentItem.cantRegReal ||
-                                newItem.aCalibrar !== currentItem.aCalibrar) {
-                                modCount++;
-                            }
-                        }
-                    });
-
+                    newData.forEach(newItem => { const currentItem = currentMap.get(newItem.tag); if (!currentItem) newCount++; else if (newItem.skid !== currentItem.skid || newItem.almacen !== currentItem.almacen) modCount++; });
                     setPendingData(newData);
                     setChangeStats({ total: newData.length, newItems: newCount, modified: modCount });
                     setIsApprovalModalOpen(true);
@@ -668,51 +792,22 @@
                 reader.onload = (ev) => {
                     const rawText = ev.target.result.replace(/\r/g, '');
                     const lines = rawText.split('\n').filter(l => l.trim().length > 0);
-                    
                     const newData = [];
                     const del = lines[0].includes(';') ? ';' : ',';
-                    // Parser robusto para headers
                     const headers = parseCSVLine(lines[0], del).map(h => h.toUpperCase());
-                    
-                    const idx = {
-                        tag: headers.findIndex(h => h === 'TAG'),
-                        skid: headers.findIndex(h => h.includes('SKID')),
-                        ubic: headers.findIndex(h => h.includes('UBICA') && !h.includes('REGISTRO')),
-                        // FIX: Buscar LABT solo por LABT, no por PROVISION
-                        lab: headers.findIndex(h => h.includes('LABT') || h.includes('CALIB')),
-                        fCalib: headers.findIndex(h => h.includes('FECHA') && h.includes('CALIB')),
-                        estReg: headers.findIndex(h => h.includes('ESTADO') && h.includes('REGIST')),
-                        fGen: headers.findIndex(h => h.includes('GENERADO')),
-                        fPres: headers.findIndex(h => h.includes('PRESENTADO')),
-                        fDev: headers.findIndex(h => h.includes('DEVOLUCION')),
-                        // FIX: Buscar "REGISTRO" para ubicación de registro (evita problemas de acentos en UBICACIÓN)
-                        ubicReg: headers.findIndex(h => h.includes('REGISTRO')),
-                        montado: headers.findIndex(h => h === 'MONTADO'),
-                        // NUEVO: Buscar columna PROVISION
-                        prov: headers.findIndex(h => h === 'PROVISION' || h.includes('PROVISION'))
-                    };
-
+                    const idx = { tag: headers.findIndex(h => h === 'TAG'), skid: headers.findIndex(h => h.includes('SKID')), ubic: headers.findIndex(h => h.includes('UBICA') && !h.includes('REGISTRO')), lab: headers.findIndex(h => h.includes('LABT') || h.includes('CALIB')), fCalib: headers.findIndex(h => h.includes('FECHA') && h.includes('CALIB')), estReg: headers.findIndex(h => h.includes('ESTADO') && h.includes('REGIST')), fGen: headers.findIndex(h => h.includes('GENERADO')), fPres: headers.findIndex(h => h.includes('PRESENTADO')), fDev: headers.findIndex(h => h.includes('DEVOLUCION')), ubicReg: headers.findIndex(h => h.includes('REGISTRO')), montado: headers.findIndex(h => h === 'MONTADO'), prov: headers.findIndex(h => h === 'PROVISION' || h.includes('PROVISION')) };
                     lines.forEach((r, i) => {
                         if (i === 0) return;
                         const c = parseCSVLine(r, del);
                         if(c[idx.tag]) {
-                            newData.push({
-                                tag: cleanStr(c[idx.tag]),
-                                skid: cleanStr(c[idx.skid]),
-                                ubicacion: cleanStr(c[idx.ubic]),
-                                lab: cleanStr(c[idx.lab]),
-                                fCalib: normalizeDate(c[idx.fCalib]),
-                                estadoReg: cleanStr(c[idx.estReg]),
-                                fGen: normalizeDate(c[idx.fGen]),
-                                fPres: normalizeDate(c[idx.fPres]),
-                                fDev: normalizeDate(c[idx.fDev]),
-                                ubicReg: cleanStr(c[idx.ubicReg]),
-                                montado: cleanStr(c[idx.montado]),
-                                provision: idx.prov !== -1 ? cleanStr(c[idx.prov]) : "Sin Dato"
-                            });
+                            newData.push({ tag: cleanStr(c[idx.tag]), skid: cleanStr(c[idx.skid]), ubicacion: cleanStr(c[idx.ubic]), lab: cleanStr(c[idx.lab]), fCalib: normalizeDate(c[idx.fCalib]), estadoReg: cleanStr(c[idx.estReg]), fGen: normalizeDate(c[idx.fGen]), fPres: normalizeDate(c[idx.fPres]), fDev: normalizeDate(c[idx.fDev]), ubicReg: cleanStr(c[idx.ubicReg]), montado: cleanStr(c[idx.montado]), provision: idx.prov !== -1 ? cleanStr(c[idx.prov]) : "Sin Dato" });
                         }
                     });
+                    
                     setRegData(newData);
+                    // SAVE DIRECTLY TO CLOUD
+                    saveToCloud(null, newData, null);
+                    
                     setUploadStats({type:'Registro Instrumentos', total:newData.length});
                     setIsSuccessModalOpen(true);
                     setActiveTab('dashboard'); 
@@ -723,6 +818,9 @@
             const confirmMatrixLoad = () => {
                 if (pendingData) {
                     setMatrixData(pendingData);
+                    // SAVE DIRECTLY TO CLOUD
+                    saveToCloud(pendingData, null, {}); // Reset edits on new matrix load? Usually yes, or keep them. Resetting for safety.
+
                     setUploadStats({type:'Matriz Actualizada', total: pendingData.length});
                     setManualEdits({}); 
                     setIsApprovalModalOpen(false);
@@ -747,51 +845,69 @@
             };
 
             const docStatusCounts = useMemo(() => {
-                const counts = flatData.reduce((acc, curr) => { 
-                    const st = curr.estadoDoc || "PENDIENTE";
-                    acc[st] = (acc[st] || 0) + 1; 
-                    return acc; 
-                }, {});
+                const counts = flatData.reduce((acc, curr) => { const st = curr.estadoDoc || "PENDIENTE"; acc[st] = (acc[st] || 0) + 1; return acc; }, {});
                 return Object.keys(counts).map(key => ({ name: key, value: counts[key] }));
             }, [flatData]);
 
-            // Gráfico 2: Estado del Registro (UBICACIÓN DE REGISTRO)
             const registryStatusCounts = useMemo(() => {
-                const counts = flatData.reduce((acc, curr) => { 
-                    const st = curr.ubicacionRegistro || "PENDIENTE";
-                    acc[st] = (acc[st] || 0) + 1; 
-                    return acc; 
-                }, {});
+                const counts = flatData.reduce((acc, curr) => { const st = curr.ubicacionRegistro || "PENDIENTE"; acc[st] = (acc[st] || 0) + 1; return acc; }, {});
                 return Object.keys(counts).map(key => ({ name: key, value: counts[key] }));
             }, [flatData]);
 
             const filteredList = filter === "TODOS" ? flatData : flatData.filter(d => d.estadoDoc === filter || d.ubicacion === filter);
 
+            // --- RENDER LOGIC ---
+            if (!user) {
+                return <LoginScreen onLogin={handleLogin} loading={loadingAuth} />;
+            }
+
             return (
                 <div className="min-h-screen bg-slate-50 p-6 font-sans relative">
                     <ConfirmModal isOpen={isDeleteModalOpen} onClose={() => setIsDeleteModalOpen(false)} onConfirm={performClearData} />
-                    <SuccessModal isOpen={isSuccessModalOpen} onClose={() => setIsSuccessModalOpen(false)} message={`Datos cargados correctamente. Total: ${uploadStats?.total || 0}`} />
+                    <SuccessModal isOpen={isSuccessModalOpen} onClose={() => setIsSuccessModalOpen(false)} message={`Datos cargados y sincronizados. Total: ${uploadStats?.total || 0}`} />
                     <ApprovalModal isOpen={isApprovalModalOpen} onClose={() => setIsApprovalModalOpen(false)} onConfirm={confirmMatrixLoad} changes={changeStats} />
 
                     <div className="flex flex-col gap-4 mb-6">
+                        {/* HEADER CON INFO DE USUARIO */}
+                        <div className="flex justify-between items-center bg-white p-4 rounded-lg shadow-sm border border-slate-200 mb-2">
+                            <div className="flex items-center gap-3">
+                                {role === 'admin' ? 
+                                    <div className="bg-blue-100 p-2 rounded-full text-blue-600"><Shield size={20}/></div> : 
+                                    <div className="bg-gray-100 p-2 rounded-full text-gray-500"><Eye size={20}/></div>
+                                }
+                                <div>
+                                    <p className="text-xs text-slate-400 font-bold uppercase">Conectado como</p>
+                                    <p className="text-sm font-bold text-slate-700">{role === 'admin' ? (user.email || 'Administrador') : 'Invitado (Solo Lectura)'}</p>
+                                </div>
+                                {loadingData && <span className="text-xs bg-yellow-100 text-yellow-700 px-2 py-1 rounded animate-pulse flex items-center gap-1"><Database size={12}/> Sincronizando...</span>}
+                            </div>
+                            <button onClick={handleLogout} className="text-red-500 hover:bg-red-50 px-3 py-1 rounded text-sm flex items-center gap-2 font-medium transition-colors"><LogOut size={16}/> Salir</button>
+                        </div>
+
                         <div className="flex flex-col xl:flex-row justify-between items-center bg-white p-6 rounded-lg shadow-sm border border-slate-200">
                             <div>
                                 <h1 className="text-3xl font-bold text-slate-800 flex items-center gap-3">Seguimiento de Obra {uploadStats && <span className="text-xs bg-green-100 text-green-800 px-2 py-1 rounded-full">Cargado: {uploadStats.type}</span>}</h1>
                                 <p className="text-slate-500">Gestión Unificada de Matriz de Ingeniería y Avance</p>
                             </div>
                             
-                            {/* BOTONERA PRINCIPAL RESTAURADA */}
                             <div className="flex gap-2 mt-4 xl:mt-0">
                                 <button onClick={() => setHideDeleted(!hideDeleted)} className={`flex items-center gap-2 px-4 py-2 rounded text-sm border font-medium transition-colors ${hideDeleted ? 'bg-blue-100 text-blue-700 border-blue-300' : 'bg-gray-100 text-gray-500 border-gray-300'}`}>{hideDeleted ? <EyeOff size={16}/> : <Eye size={16}/>} {hideDeleted ? "Ocultando Eliminados" : "Ver Eliminados"}</button>
-                                <button onClick={() => setIsDeleteModalOpen(true)} className="flex items-center gap-2 bg-white border border-red-200 text-red-600 px-4 py-2 rounded text-sm hover:bg-red-50"><Trash2 size={16}/> Limpiar</button>
+                                
                                 <button onClick={downloadExport} className="flex items-center gap-2 bg-white border border-slate-300 text-slate-700 px-4 py-2 rounded text-sm hover:bg-slate-50"><Save size={16}/> Guardar (CSV)</button>
-                                
-                                {/* INPUTS Y BOTONES ORIGINALES */}
-                                <input type="file" ref={fileInputRef} onChange={handleMatrixUpload} accept=".csv" className="hidden" />
-                                <button onClick={() => fileInputRef.current.click()} className="flex items-center gap-2 bg-purple-600 text-white px-4 py-2 rounded text-sm hover:bg-purple-700 shadow-md transform active:scale-95 transition-transform"><Upload size={16}/> Cargar Matriz Maestra</button>
-                                
-                                <input type="file" ref={regInputRef} onChange={handleRegUpload} accept=".csv" className="hidden" />
-                                <button onClick={() => regInputRef.current.click()} className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded text-sm hover:bg-blue-700 shadow-md transform active:scale-95 transition-transform"><Upload size={16}/> Cargar Reg. Inst.</button>
+
+                                {/* CONTROLES DE ADMIN */}
+                                {role === 'admin' && (
+                                    <>
+                                        <div className="h-8 w-px bg-slate-300 mx-2"></div>
+                                        <button onClick={() => setIsDeleteModalOpen(true)} className="flex items-center gap-2 bg-white border border-red-200 text-red-600 px-4 py-2 rounded text-sm hover:bg-red-50"><Trash2 size={16}/> Limpiar Nube</button>
+                                        
+                                        <input type="file" ref={fileInputRef} onChange={handleMatrixUpload} accept=".csv" className="hidden" />
+                                        <button onClick={() => fileInputRef.current.click()} className="flex items-center gap-2 bg-purple-600 text-white px-4 py-2 rounded text-sm hover:bg-purple-700 shadow-md transform active:scale-95 transition-transform"><Upload size={16}/> Matriz</button>
+                                        
+                                        <input type="file" ref={regInputRef} onChange={handleRegUpload} accept=".csv" className="hidden" />
+                                        <button onClick={() => regInputRef.current.click()} className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded text-sm hover:bg-blue-700 shadow-md transform active:scale-95 transition-transform"><Upload size={16}/> Registros</button>
+                                    </>
+                                )}
                             </div>
                         </div>
                         <div className="flex gap-6 border-b border-slate-200 px-4">
@@ -807,7 +923,6 @@
                                 <MetricCard title="Finalizados" value={flatData.filter(d => d.estadoDoc === "FINALIZADO").length} percentage={flatData.length > 0 ? ((flatData.filter(d => d.estadoDoc === "FINALIZADO").length / flatData.length) * 100).toFixed(0) : 0} icon={CheckCircle} color="#15803d" />
                                 <MetricCard title="En Inspección" value={flatData.filter(d => d.estadoDoc === "EN INSPECCIÓN").length} percentage={flatData.length > 0 ? ((flatData.filter(d => d.estadoDoc === "EN INSPECCIÓN").length / flatData.length) * 100).toFixed(0) : 0} icon={Clock} color="#eab308" />
                                 <MetricCard title="Laboratorio" value={flatData.filter(d => d.estadoDoc === "EN LABORATORIO").length} icon={Wrench} color="#f97316" />
-                                {/* NUEVA TARJETA: Estado Skid */}
                                 <MetricCard title="Estado Skid" value={`ON: ${skidCounts.ON} | OFF: ${skidCounts.OFF}`} icon={Box} color="#8b5cf6" />
                             </div>
 
@@ -838,7 +953,6 @@
                                         </PieChart>
                                     </ResponsiveContainer>
                                 </div>
-                                {/* NUEVO GRÁFICO: Ubicación Física Apilada por Provisión */}
                                 <div className="bg-white p-6 rounded-lg shadow border border-slate-100 h-80">
                                     <h3 className="text-lg font-bold text-slate-700 mb-4">Ubicación Física por Provisión</h3>
                                     <ResponsiveContainer width="100%" height="100%">
@@ -885,9 +999,9 @@
                                             {filteredList.map((row, idx) => (
                                                 <tr key={idx} className="bg-white hover:bg-slate-50">
                                                     <td className="px-6 py-3 font-medium">{row.tag}</td>
-                                                    {/* FIX: Usar select para Lab */}
                                                     <td className="px-2 py-1">
                                                         <select 
+                                                            disabled={role !== 'admin'}
                                                             className="select-edit" 
                                                             value={row.proveedor === "Sin Prov." ? "" : row.proveedor} 
                                                             onChange={(e) => handleRegEdit(row.tag, 'lab', e.target.value)}
@@ -898,13 +1012,13 @@
                                                             ))}
                                                         </select>
                                                     </td>
-                                                    <td className="px-2 py-1"><input type="date" className="input-edit" value={row.fechaGen} onChange={(e) => handleRegEdit(row.tag, 'fGen', e.target.value)}/></td>
-                                                    <td className="px-2 py-1"><input type="date" className="input-edit" value={row.fechaPres} onChange={(e) => handleRegEdit(row.tag, 'fPres', e.target.value)}/></td>
-                                                    <td className="px-2 py-1"><input type="date" className="input-edit" value={row.fechaDev} onChange={(e) => handleRegEdit(row.tag, 'fDev', e.target.value)}/></td>
+                                                    <td className="px-2 py-1"><input disabled={role !== 'admin'} type="date" className="input-edit" value={row.fechaGen} onChange={(e) => handleRegEdit(row.tag, 'fGen', e.target.value)}/></td>
+                                                    <td className="px-2 py-1"><input disabled={role !== 'admin'} type="date" className="input-edit" value={row.fechaPres} onChange={(e) => handleRegEdit(row.tag, 'fPres', e.target.value)}/></td>
+                                                    <td className="px-2 py-1"><input disabled={role !== 'admin'} type="date" className="input-edit" value={row.fechaDev} onChange={(e) => handleRegEdit(row.tag, 'fDev', e.target.value)}/></td>
                                                     <td className="px-6 py-3"><span className={`px-2 py-1 rounded text-xs font-bold ${row.estadoDoc === 'FINALIZADO' ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'}`}>{row.estadoDoc}</span></td>
                                                     <td className="px-6 py-3 font-bold text-right text-slate-600">{row.ubicacionRegistro}</td>
                                                     <td className="px-2 py-1">
-                                                        <select className="select-edit" value={row.montado} onChange={(e) => handleRegEdit(row.tag, 'montado', e.target.value)}>
+                                                        <select disabled={role !== 'admin'} className="select-edit" value={row.montado} onChange={(e) => handleRegEdit(row.tag, 'montado', e.target.value)}>
                                                             <option value="SIN MONTAR">SIN MONTAR</option>
                                                             <option value="MONTADO">MONTADO</option>
                                                         </select>
@@ -925,7 +1039,6 @@
 
                     {activeTab === 'systems' && (
                         <div className="animate-enter">
-                            {/* NUEVAS TARJETAS POR ESPECIALIDAD */}
                             <div className="grid grid-cols-1 md:grid-cols-5 gap-4 mb-6">
                                 {specialtyStats.map((spec) => (
                                     <MetricCard 
@@ -949,8 +1062,6 @@
                                     <h3 className="text-sm font-medium text-gray-500 uppercase">Total Tags</h3>
                                     <p className="text-3xl font-bold text-gray-800">{filteredMatrixData.length}</p>
                                 </div>
-                                
-                                {/* NUEVO CUADRO DE KPI: Total Registros (Alcance) - CORREGIDO */}
                                 <div className="bg-white p-4 rounded-lg shadow border-l-4 border-cyan-500">
                                     <h3 className="text-sm font-medium text-gray-500 uppercase">Total Registros</h3>
                                     <div className="flex justify-between items-center">
@@ -979,7 +1090,7 @@
                                         </thead>
                                         <tbody className="divide-y divide-slate-100">
                                             {systemsStats.map((sys) => (
-                                                <ExpandableRow key={sys.id} sys={sys} isExpanded={expandedRows[sys.id]} onToggle={() => toggleRow(sys.id)} onEdit={handleTagEdit} skidOptions={skidOptions} almacenOptions={almacenOptions}/>
+                                                <ExpandableRow key={sys.id} sys={sys} isExpanded={expandedRows[sys.id]} onToggle={() => toggleRow(sys.id)} onEdit={handleTagEdit} skidOptions={skidOptions} almacenOptions={almacenOptions} isReadOnly={role !== 'admin'} />
                                             ))}
                                         </tbody>
                                     </table>
