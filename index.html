@@ -69,7 +69,7 @@
         import { getAuth, signInWithCustomToken, signInAnonymously, onAuthStateChanged, signOut, signInWithEmailAndPassword, createUserWithEmailAndPassword } from "firebase/auth";
         import { getFirestore, doc, setDoc, onSnapshot, collection, writeBatch, getDocs, query, orderBy } from "firebase/firestore";
 
-        // --- CONFIGURACIÓN FIREBASE (Modificada por el usuario) ---
+        // --- CONFIGURACIÓN FIREBASE ---
         const getFirebaseConfig = () => {
             return {
                 config: {
@@ -87,8 +87,7 @@
         };
 
         // --- HELPERS PARA FRAGMENTACIÓN (CHUNKING) ---
-        // Firestore limita los documentos a 1MB. Esto divide strings largos.
-        const CHUNK_SIZE = 800000; // ~800KB para estar seguros
+        const CHUNK_SIZE = 800000;
 
         const chunkString = (str, length) => {
             const size = Math.ceil(str.length / length);
@@ -101,47 +100,32 @@
             return r;
         };
 
-        // Guarda datos grandes dividiéndolos en sub-documentos
         const saveLargeData = async (db, appId, collectionName, dataString) => {
             const chunks = chunkString(dataString, CHUNK_SIZE);
             const batch = writeBatch(db);
             const colRef = collection(db, 'artifacts', appId, 'public', 'data', collectionName);
-            
-            // 1. Limpiar colección vieja (Simplificación: Sobrescribimos IDs 0, 1, 2...)
-            // Idealmente borraríamos todo primero, pero writeBatch tiene limite de 500.
-            // Asumimos que escribimos encima. El Metadata llevará la cuenta de cuantos leer.
-            
             chunks.forEach((chunk, index) => {
                 const docRef = doc(colRef, index.toString());
                 batch.set(docRef, { data: chunk });
             });
-
             await batch.commit();
             return chunks.length;
         };
 
-        // Lee datos grandes re-ensamblando los fragmentos
         const fetchLargeData = async (db, appId, collectionName, totalChunks) => {
             if (!totalChunks || totalChunks === 0) return [];
-            
             const colRef = collection(db, 'artifacts', appId, 'public', 'data', collectionName);
-            // Traemos todo y ordenamos en memoria para asegurar consistencia
             const q = query(colRef); 
             const querySnapshot = await getDocs(q);
-            
-            let combinedString = "";
             const chunks = [];
-            
             querySnapshot.forEach((doc) => {
                 const idx = parseInt(doc.id);
                 if (!isNaN(idx) && idx < totalChunks) {
                     chunks[idx] = doc.data().data;
                 }
             });
-
             return JSON.parse(chunks.join(""));
         };
-
 
         // --- FUNCIONES DE LIMPIEZA & UTILS ---
         const cleanStr = (str) => {
@@ -514,12 +498,8 @@
                     return;
                 }
 
-                const initAuth = async () => {
-                    // Eliminamos el intento de usar custom token del entorno
-                    // porque ahora la configuración es manual y los tokens no coinciden.
-                    setLoadingAuth(false);
-                };
-                initAuth();
+                // Autologin eliminado para evitar conflictos en entorno manual
+                setLoadingAuth(false);
 
                 const unsubscribe = onAuthStateChanged(auth, (u) => {
                     setUser(u);
@@ -668,7 +648,12 @@
                         }
                     }
                 } catch (err) {
-                    alert("Error de autenticación: " + err.message);
+                    console.error("Login Error:", err);
+                    if (err.code === 'auth/admin-restricted-operation' || err.message.includes('admin-restricted-operation')) {
+                        alert("Error: El acceso anónimo (Solo Lectura) no está habilitado en tu proyecto Firebase.\n\nVe a Firebase Console -> Authentication -> Sign-in method y habilita 'Anonymous'.");
+                    } else {
+                        alert("Error de autenticación: " + err.message);
+                    }
                 } finally {
                     setLoadingAuth(false);
                 }
