@@ -442,6 +442,7 @@
             const [role, setRole] = useState('viewer'); // 'viewer' | 'admin'
             const [loadingAuth, setLoadingAuth] = useState(true);
             const [loadingData, setLoadingData] = useState(false);
+            const [isSaving, setIsSaving] = useState(false); // NUEVO ESTADO: isSaving
             const [errorMsg, setErrorMsg] = useState('');
 
             // Data State
@@ -562,6 +563,7 @@
             // --- 3. SAVE DATA HELPER ---
             const saveToCloud = async (newMatrix, newReg, newEdits) => {
                 if (role !== 'admin' || !db) return;
+                setIsSaving(true); // INICIO BLOQUEO
                 try {
                     // 1. Calcular nuevos datos o usar actuales
                     const finalMatrix = newMatrix || matrixData;
@@ -607,6 +609,8 @@
 
                 } catch (e) {
                     alert("Error guardando en la nube: " + e.message);
+                } finally {
+                    setIsSaving(false); // FIN BLOQUEO
                 }
             };
 
@@ -940,48 +944,19 @@
                 }
             };
 
-            const downloadMatrix = () => {
-                let csvContent = "data:text/csv;charset=utf-8,TAG;ESPECIALIDAD;DESCRIPCION;SISTEMA;SUBSISTEMA;SKID;ALMACEN;A_CALIBRAR;CANT_REG_TOT;CANT_REG_REAL;ESTADO_CALCULADO\n";
+            const downloadExport = () => {
+                let csvContent = "data:text/csv;charset=utf-8,TAG;ESTADO;DOC_TOT;DOC_REAL\n";
                 matrixData.forEach(row => {
                     const edit = manualEdits[row.tag];
                     const state = calculateState(row, edit);
-                    const skid = edit?.skid !== undefined ? edit.skid : row.skid;
-                    const alm = edit?.almacen !== undefined ? edit.almacen : row.almacen;
-                    const calib = edit?.aCalibrar !== undefined ? edit.aCalibrar : row.aCalibrar;
-                    const cTot = edit?.cantRegTot !== undefined ? edit.cantRegTot : row.cantRegTot;
-                    const cReal = edit?.cantRegReal !== undefined ? edit.cantRegReal : row.cantRegReal;
-                    
-                    const line = [
-                        row.tag, row.especialidad, row.descripcion, row.sistema, row.subsistema,
-                        skid, alm, calib, cTot, cReal, state
-                    ].map(f => cleanStr(f)).join(';');
-                    csvContent += line + "\n";
+                    csvContent += `${row.tag};${state};${edit?.cantRegTot||row.cantRegTot};${edit?.cantRegReal||row.cantRegReal}\n`;
                 });
                 const encodedUri = encodeURI(csvContent);
                 const link = document.createElement("a");
                 link.setAttribute("href", encodedUri);
-                link.setAttribute("download", "matriz_abm.csv");
+                link.setAttribute("download", "avance_obra.csv");
                 document.body.appendChild(link);
                 link.click();
-                document.body.removeChild(link);
-            };
-
-            const downloadRegistry = () => {
-                let csvContent = "data:text/csv;charset=utf-8,TAG;SKID;UBICACION;LAB;F_CALIB;ESTADO_REG;F_GEN;F_PRES;F_DEV;UBICACION_REG;MONTADO;PROVISION\n";
-                regData.forEach(row => {
-                    const line = [
-                        row.tag, row.skid, row.ubicacion, row.lab, row.fCalib, row.estadoReg,
-                        row.fGen, row.fPres, row.fDev, row.ubicReg, row.montado, row.provision
-                    ].map(f => cleanStr(f)).join(';');
-                    csvContent += line + "\n";
-                });
-                const encodedUri = encodeURI(csvContent);
-                const link = document.createElement("a");
-                link.setAttribute("href", encodedUri);
-                link.setAttribute("download", "registro_instrumentos.csv");
-                document.body.appendChild(link);
-                link.click();
-                document.body.removeChild(link);
             };
 
             const docStatusCounts = useMemo(() => {
@@ -1067,13 +1042,31 @@
                                 {role === 'admin' && (
                                     <>
                                         <div className="h-8 w-px bg-slate-300 mx-2"></div>
-                                        <button onClick={() => setIsDeleteModalOpen(true)} className="flex items-center gap-2 bg-white border border-red-200 text-red-600 px-4 py-2 rounded text-sm hover:bg-red-50"><Trash2 size={16}/> Limpiar Nube</button>
+                                        <button 
+                                            onClick={() => setIsDeleteModalOpen(true)} 
+                                            disabled={loadingData || isSaving}
+                                            className={`flex items-center gap-2 border px-4 py-2 rounded text-sm transition-colors ${loadingData || isSaving ? 'bg-slate-100 text-slate-400 border-slate-200 cursor-not-allowed' : 'bg-white border-red-200 text-red-600 hover:bg-red-50'}`}
+                                        >
+                                            <Trash2 size={16}/> Limpiar Nube
+                                        </button>
                                         
-                                        <input type="file" ref={fileInputRef} onChange={handleMatrixUpload} accept=".csv" className="hidden" />
-                                        <button onClick={() => fileInputRef.current.click()} className="flex items-center gap-2 bg-purple-600 text-white px-4 py-2 rounded text-sm hover:bg-purple-700 shadow-md transform active:scale-95 transition-transform"><Upload size={16}/> Matriz</button>
+                                        <input type="file" ref={fileInputRef} onChange={handleMatrixUpload} accept=".csv" className="hidden" disabled={loadingData || isSaving} />
+                                        <button 
+                                            onClick={() => fileInputRef.current.click()} 
+                                            disabled={loadingData || isSaving}
+                                            className={`flex items-center gap-2 text-white px-4 py-2 rounded text-sm shadow-md transform active:scale-95 transition-transform ${loadingData || isSaving ? 'bg-purple-400 cursor-not-allowed' : 'bg-purple-600 hover:bg-purple-700'}`}
+                                        >
+                                            <Upload size={16}/> Matriz
+                                        </button>
                                         
-                                        <input type="file" ref={regInputRef} onChange={handleRegUpload} accept=".csv" className="hidden" />
-                                        <button onClick={() => regInputRef.current.click()} className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded text-sm hover:bg-blue-700 shadow-md transform active:scale-95 transition-transform"><Upload size={16}/> Registros</button>
+                                        <input type="file" ref={regInputRef} onChange={handleRegUpload} accept=".csv" className="hidden" disabled={loadingData || isSaving} />
+                                        <button 
+                                            onClick={() => regInputRef.current.click()} 
+                                            disabled={loadingData || isSaving}
+                                            className={`flex items-center gap-2 text-white px-4 py-2 rounded text-sm shadow-md transform active:scale-95 transition-transform ${loadingData || isSaving ? 'bg-blue-400 cursor-not-allowed' : 'bg-blue-600 hover:bg-blue-700'}`}
+                                        >
+                                            <Upload size={16}/> Registros
+                                        </button>
                                     </>
                                 )}
                             </div>
