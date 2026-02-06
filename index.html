@@ -67,25 +67,10 @@
         // --- FIREBASE IMPORTS ---
         import { initializeApp } from "firebase/app";
         import { getAuth, signInWithCustomToken, signInAnonymously, onAuthStateChanged, signOut, signInWithEmailAndPassword, createUserWithEmailAndPassword } from "firebase/auth";
-        import { getFirestore, doc, setDoc, onSnapshot, collection } from "firebase/firestore";
+        import { getFirestore, doc, setDoc, onSnapshot, collection, writeBatch, getDocs, query, orderBy } from "firebase/firestore";
 
-        // --- GESTIÓN DE CONFIGURACIÓN SEGURA ---
+        // --- CONFIGURACIÓN FIREBASE (Modificada por el usuario) ---
         const getFirebaseConfig = () => {
-            // Caso 1: Entorno Immersive (Variables globales inyectadas)
-            if (typeof __firebase_config !== 'undefined' && typeof __app_id !== 'undefined') {
-                try {
-                    return {
-                        config: JSON.parse(__firebase_config),
-                        appId: __app_id,
-                        isConfigured: true
-                    };
-                } catch (e) {
-                    console.error("Error parseando config inyectada", e);
-                }
-            }
-            
-            // Caso 2: GitHub Pages / Localhost (Configuración Manual Requerida)
-            // IMPORTANTE: Si subes esto a GitHub, reemplaza los valores de abajo con los de tu proyecto Firebase real.
             return {
                 config: {
                     apiKey: "AIzaSyCon3w6IFtCGpwPi25e8dwFRU_R0CzQmjc",
@@ -97,9 +82,66 @@
                     measurementId: "G-H034T2EXR5"
                 },
                 appId: "tablero-de-control---obra", 
-                isConfigured: true // CONFIGURADO MANUALMENTE
+                isConfigured: true 
             };
         };
+
+        // --- HELPERS PARA FRAGMENTACIÓN (CHUNKING) ---
+        // Firestore limita los documentos a 1MB. Esto divide strings largos.
+        const CHUNK_SIZE = 800000; // ~800KB para estar seguros
+
+        const chunkString = (str, length) => {
+            const size = Math.ceil(str.length / length);
+            const r = Array(size);
+            let offset = 0;
+            for (let i = 0; i < size; i++) {
+                r[i] = str.substr(offset, length);
+                offset += length;
+            }
+            return r;
+        };
+
+        // Guarda datos grandes dividiéndolos en sub-documentos
+        const saveLargeData = async (db, appId, collectionName, dataString) => {
+            const chunks = chunkString(dataString, CHUNK_SIZE);
+            const batch = writeBatch(db);
+            const colRef = collection(db, 'artifacts', appId, 'public', 'data', collectionName);
+            
+            // 1. Limpiar colección vieja (Simplificación: Sobrescribimos IDs 0, 1, 2...)
+            // Idealmente borraríamos todo primero, pero writeBatch tiene limite de 500.
+            // Asumimos que escribimos encima. El Metadata llevará la cuenta de cuantos leer.
+            
+            chunks.forEach((chunk, index) => {
+                const docRef = doc(colRef, index.toString());
+                batch.set(docRef, { data: chunk });
+            });
+
+            await batch.commit();
+            return chunks.length;
+        };
+
+        // Lee datos grandes re-ensamblando los fragmentos
+        const fetchLargeData = async (db, appId, collectionName, totalChunks) => {
+            if (!totalChunks || totalChunks === 0) return [];
+            
+            const colRef = collection(db, 'artifacts', appId, 'public', 'data', collectionName);
+            // Traemos todo y ordenamos en memoria para asegurar consistencia
+            const q = query(colRef); 
+            const querySnapshot = await getDocs(q);
+            
+            let combinedString = "";
+            const chunks = [];
+            
+            querySnapshot.forEach((doc) => {
+                const idx = parseInt(doc.id);
+                if (!isNaN(idx) && idx < totalChunks) {
+                    chunks[idx] = doc.data().data;
+                }
+            });
+
+            return JSON.parse(chunks.join(""));
+        };
+
 
         // --- FUNCIONES DE LIMPIEZA & UTILS ---
         const cleanStr = (str) => {
@@ -473,11 +515,8 @@
                 }
 
                 const initAuth = async () => {
-                    if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
-                        try {
-                            await signInWithCustomToken(auth, __initial_auth_token);
-                        } catch(e) { console.error("Auto login error", e); }
-                    }
+                    // Eliminamos el intento de usar custom token del entorno
+                    // porque ahora la configuración es manual y los tokens no coinciden.
                     setLoadingAuth(false);
                 };
                 initAuth();
@@ -499,26 +538,48 @@
                 setLoadingData(true);
                 setErrorMsg('');
                 
-                // Usamos path con segmento par (/main)
-                const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'instrument_app', 'main');
+                // Escuchamos el documento "Metadata" principal para saber qué hay
+                const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'app_metadata', 'main');
                 
-                const unsub = onSnapshot(docRef, (snap) => {
+                const unsub = onSnapshot(docRef, async (snap) => {
                     if (snap.exists()) {
-                        const data = snap.data();
-                        if (data.matrix) setMatrixData(JSON.parse(data.matrix));
-                        if (data.registry) setRegData(JSON.parse(data.registry));
-                        if (data.edits) setManualEdits(data.edits);
+                        const meta = snap.data();
+                        
+                        // Cargar Edits (son pequeños, viven en metadata)
+                        if (meta.edits) setManualEdits(JSON.parse(meta.edits));
+
+                        // Cargar Matrix (Si cambió el conteo, recargamos)
+                        if (meta.matrixChunkCount > 0) {
+                            try {
+                                const mData = await fetchLargeData(db, appId, 'matrix_chunks', meta.matrixChunkCount);
+                                setMatrixData(mData);
+                            } catch(e) { console.error("Error loading matrix chunks", e); }
+                        } else {
+                            setMatrixData([]);
+                        }
+
+                        // Cargar Registry
+                        if (meta.registryChunkCount > 0) {
+                            try {
+                                const rData = await fetchLargeData(db, appId, 'registry_chunks', meta.registryChunkCount);
+                                setRegData(rData);
+                            } catch(e) { console.error("Error loading registry chunks", e); }
+                        } else {
+                            setRegData([]);
+                        }
+
                     } else {
+                        // DB vacía
                         setMatrixData([]);
                         setRegData([]);
+                        setManualEdits({});
                     }
                     setLoadingData(false);
                 }, (err) => {
                     console.error("Error fetching data:", err);
                     setLoadingData(false);
-                    // Detección específica de error de permisos para UI amigable
                     if(err.code === 'permission-denied') {
-                        setErrorMsg('Acceso denegado. Es posible que tus reglas de Firestore no permitan lectura pública o que el appId sea incorrecto.');
+                        setErrorMsg('Acceso denegado. Verifica las reglas de Firestore.');
                     } else {
                         setErrorMsg(`Error de conexión: ${err.message}`);
                     }
@@ -531,14 +592,48 @@
             const saveToCloud = async (newMatrix, newReg, newEdits) => {
                 if (role !== 'admin' || !db) return;
                 try {
-                    const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'instrument_app', 'main');
-                    await setDoc(docRef, {
-                        matrix: JSON.stringify(newMatrix || matrixData),
-                        registry: JSON.stringify(newReg || regData),
-                        edits: newEdits || manualEdits,
+                    // 1. Calcular nuevos datos o usar actuales
+                    const finalMatrix = newMatrix || matrixData;
+                    const finalReg = newReg || regData;
+                    const finalEdits = newEdits || manualEdits;
+
+                    // 2. Guardar chunks de Matrix
+                    let mCount = 0;
+                    if(newMatrix) {
+                        mCount = await saveLargeData(db, appId, 'matrix_chunks', JSON.stringify(finalMatrix));
+                    } else {
+                        // Si no estamos actualizando la matriz, necesitamos saber cuantos chunks hay actualmente.
+                        // Para simplificar, leemos del estado actual si no tenemos el conteo a mano,
+                        // pero idealmente 'saveToCloud' se llama cuando cambian cosas.
+                        // Si solo cambiamos edits, no re-guardamos la matriz gigante.
+                        // Hack: leemos el conteo previo si no cambiamos la matriz.
+                        // Mejor estrategia: Guardar solo lo que cambió.
+                    }
+
+                    // 3. Guardar chunks de Registry
+                    let rCount = 0;
+                    if(newReg) {
+                        rCount = await saveLargeData(db, appId, 'registry_chunks', JSON.stringify(finalReg));
+                    }
+
+                    // 4. Actualizar Metadata
+                    const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'app_metadata', 'main');
+                    
+                    // Necesitamos leer el meta actual para no perder los conteos si solo guardamos edits
+                    // pero estamos en un entorno async.
+                    // Estrategia segura: merge: true
+                    
+                    const updatePayload = {
+                        edits: JSON.stringify(finalEdits),
                         lastUpdated: new Date().toISOString(),
                         updatedBy: user.email || 'Admin'
-                    });
+                    };
+
+                    if (newMatrix) updatePayload.matrixChunkCount = mCount;
+                    if (newReg) updatePayload.registryChunkCount = rCount;
+
+                    await setDoc(docRef, updatePayload, { merge: true });
+
                 } catch (e) {
                     alert("Error guardando en la nube: " + e.message);
                 }
@@ -587,6 +682,7 @@
             };
 
             const performClearData = () => {
+                // Para limpiar, guardamos arrays vacíos
                 saveToCloud([], [], {});
                 setMatrixData([]); setRegData([]); setManualEdits({}); setUploadStats(null); setFilter("TODOS"); setExpandedRows({});
                 if (fileInputRef.current) fileInputRef.current.value = "";
@@ -617,7 +713,7 @@
                 
                 // Optimistic UI Update
                 setManualEdits(updatedEdits);
-                // Save to Cloud (Debounced idealmente, pero directo para simpleza)
+                // Save to Cloud (Solo edits)
                 saveToCloud(null, null, updatedEdits);
             };
             
@@ -636,6 +732,7 @@
                 });
 
                 setRegData(newRegData);
+                // Save Reg Data + Edits (null Matrix to skip saving it)
                 saveToCloud(null, newRegData, null);
             };
 
