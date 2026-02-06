@@ -242,15 +242,16 @@
                     setError('La aplicación no está configurada para conectarse a Firebase.');
                     return;
                 }
-                if (mode === 'view') {
-                    onLogin('view');
-                } else {
-                    if (!email || !password) {
-                        setError('Por favor complete todos los campos');
-                        return;
-                    }
-                    onLogin('admin', { email, password, isRegistering });
+                
+                // Validación básica para ambos modos
+                if (!email || !password) {
+                    setError('Por favor complete todos los campos');
+                    return;
                 }
+                
+                // Enviamos mode para que el componente padre sepa, 
+                // pero la autenticación será siempre con email/password
+                onLogin(mode, { email, password, isRegistering });
             };
 
             return (
@@ -274,7 +275,7 @@
                                     onClick={() => { setMode('view'); setError(''); }} 
                                     className={`flex-1 pb-2 text-sm font-semibold transition-colors flex justify-center items-center gap-2 ${mode === 'view' ? 'text-blue-600 border-b-2 border-blue-600' : 'text-slate-400'}`}
                                 >
-                                    <Eye size={18}/> Solo Lectura
+                                    <Eye size={18}/> Visualizador
                                 </button>
                                 <button 
                                     onClick={() => { setMode('admin'); setError(''); }} 
@@ -285,32 +286,29 @@
                             </div>
 
                             <form onSubmit={handleSubmit} className="flex flex-col gap-4">
-                                {mode === 'admin' && (
-                                    <>
-                                        <div>
-                                            <label className="text-xs font-bold text-slate-500 uppercase">Email</label>
-                                            <input type="email" value={email} onChange={e=>setEmail(e.target.value)} className="w-full p-2 border border-slate-300 rounded focus:border-blue-500 outline-none" placeholder="admin@obra.com" />
-                                        </div>
-                                        <div>
-                                            <label className="text-xs font-bold text-slate-500 uppercase">Contraseña</label>
-                                            <input type="password" value={password} onChange={e=>setPassword(e.target.value)} className="w-full p-2 border border-slate-300 rounded focus:border-blue-500 outline-none" placeholder="••••••••" />
-                                        </div>
-                                        <div className="flex items-center gap-2 mt-1">
-                                            <input type="checkbox" id="regCheck" checked={isRegistering} onChange={e => setIsRegistering(e.target.checked)} className="rounded text-blue-600"/>
-                                            <label htmlFor="regCheck" className="text-xs text-slate-500 select-none">Crear cuenta nueva si no existe</label>
-                                        </div>
-                                    </>
-                                )}
+                                {/* Campos visibles para ambos modos */}
+                                <div>
+                                    <label className="text-xs font-bold text-slate-500 uppercase">Email</label>
+                                    <input type="email" value={email} onChange={e=>setEmail(e.target.value)} className="w-full p-2 border border-slate-300 rounded focus:border-blue-500 outline-none" placeholder={mode === 'admin' ? "admin@obra.com" : "usuario@obra.com"} />
+                                </div>
+                                <div>
+                                    <label className="text-xs font-bold text-slate-500 uppercase">Contraseña</label>
+                                    <input type="password" value={password} onChange={e=>setPassword(e.target.value)} className="w-full p-2 border border-slate-300 rounded focus:border-blue-500 outline-none" placeholder="••••••••" />
+                                </div>
+                                <div className="flex items-center gap-2 mt-1">
+                                    <input type="checkbox" id="regCheck" checked={isRegistering} onChange={e => setIsRegistering(e.target.checked)} className="rounded text-blue-600"/>
+                                    <label htmlFor="regCheck" className="text-xs text-slate-500 select-none">Crear cuenta nueva si no existe</label>
+                                </div>
 
                                 {error && <div className="bg-red-50 text-red-600 p-3 rounded text-sm flex items-center gap-2"><AlertCircle size={16}/> {error}</div>}
 
                                 <button disabled={loading || !isConfigured} type="submit" className={`mt-4 py-2 rounded font-bold shadow-lg transform active:scale-95 transition-all flex justify-center items-center gap-2 ${!isConfigured ? 'bg-gray-300 cursor-not-allowed text-gray-500' : 'bg-blue-600 hover:bg-blue-700 text-white'}`}>
                                     {loading ? <RefreshCw className="animate-spin"/> : <LogIn size={18} />}
-                                    {mode === 'view' ? 'Ingresar como Invitado' : (isRegistering ? 'Registrar y Entrar' : 'Iniciar Sesión')}
+                                    {isRegistering ? 'Registrar y Entrar' : 'Iniciar Sesión'}
                                 </button>
                             </form>
                             
-                            {mode === 'view' && <p className="text-xs text-center text-slate-400 mt-4">Podrás ver los gráficos y tablas, pero no editar datos ni cargar archivos.</p>}
+                            {mode === 'view' && <p className="text-xs text-center text-slate-400 mt-4">Acceso limitado a visualización de datos.</p>}
                         </div>
                     </div>
                 </div>
@@ -505,8 +503,14 @@
                     setUser(u);
                     setLoadingAuth(false);
                     if (u) {
-                        if (u.isAnonymous) setRole('viewer');
-                        else setRole('admin'); 
+                        // LÓGICA DE ROLES BASADA EN EMAIL (Simple Demo)
+                        // Si el email empieza con "admin", es admin.
+                        // En producción, esto debería ser vía Custom Claims o una colección 'users'
+                        if (u.email && u.email.toLowerCase().startsWith('admin')) {
+                            setRole('admin');
+                        } else {
+                            setRole('viewer');
+                        }
                     }
                 });
                 return () => unsubscribe();
@@ -637,23 +641,17 @@
                 if(!auth) return;
                 setLoadingAuth(true);
                 try {
-                    if (selectedMode === 'view') {
-                        await signInAnonymously(auth);
+                    // AMBOS MODOS USAN EMAIL/PASSWORD AHORA
+                    // Se elimina signInAnonymously
+                    const { email, password, isRegistering } = credentials;
+                    if (isRegistering) {
+                        await createUserWithEmailAndPassword(auth, email, password);
                     } else {
-                        const { email, password, isRegistering } = credentials;
-                        if (isRegistering) {
-                            await createUserWithEmailAndPassword(auth, email, password);
-                        } else {
-                            await signInWithEmailAndPassword(auth, email, password);
-                        }
+                        await signInWithEmailAndPassword(auth, email, password);
                     }
                 } catch (err) {
                     console.error("Login Error:", err);
-                    if (err.code === 'auth/admin-restricted-operation' || err.message.includes('admin-restricted-operation')) {
-                        alert("Error: El acceso anónimo (Solo Lectura) no está habilitado en tu proyecto Firebase.\n\nVe a Firebase Console -> Authentication -> Sign-in method y habilita 'Anonymous'.");
-                    } else {
-                        alert("Error de autenticación: " + err.message);
-                    }
+                    alert("Error de autenticación: " + err.message);
                 } finally {
                     setLoadingAuth(false);
                 }
