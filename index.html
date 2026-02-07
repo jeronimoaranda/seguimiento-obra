@@ -62,7 +62,7 @@
         import React, { useState, useMemo, useRef, useEffect } from 'react';
         import { createRoot } from 'react-dom/client';
         import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, PieChart, Pie, Cell, ResponsiveContainer, Label, LabelList } from 'recharts';
-        import { AlertCircle, CheckCircle, Clock, Activity, Upload, Trash2, HardHat, Download, X, AlertTriangle, Target, Layers, FileSpreadsheet, LayoutDashboard, ChevronDown, ChevronRight, Boxes, PlayCircle, Wrench, Zap, Hammer, FileWarning, Package, Truck, ClipboardCheck, Edit3, Save, Eye, EyeOff, FileCheck, RefreshCw, CalendarDays, Search, FileText, MapPin, Box, LogIn, User, Shield, LogOut, Database, Settings } from 'lucide-react';
+        import { AlertCircle, CheckCircle, Clock, Activity, Upload, Trash2, HardHat, Download, X, AlertTriangle, Target, Layers, FileSpreadsheet, LayoutDashboard, ChevronDown, ChevronRight, Boxes, PlayCircle, Wrench, Zap, Hammer, FileWarning, Package, Truck, ClipboardCheck, Edit3, Save, Eye, EyeOff, FileCheck, RefreshCw, CalendarDays, Search, FileText, MapPin, Box, LogIn, User, Shield, LogOut, Database, Settings, Filter } from 'lucide-react';
         
         // --- FIREBASE IMPORTS ---
         import { initializeApp } from "firebase/app";
@@ -174,7 +174,101 @@
         const COLORS = { blue: "#3b82f6", green: "#10b981", orange: "#f97316", red: "#ef4444", yellow: "#eab308", purple: "#a855f7", indigo: "#6366f1", gray: "#64748b", teal: "#14b8a6", pink: "#db2777", cyan: "#06b6d4" };
         const COLORS_LIST = Object.values(COLORS);
 
-        // --- COMPONENTES UI (MODALES) ---
+        // --- COMPONENTES UI (MODALES & FILTROS) ---
+        const TableFilter = ({ columnKey, data, currentFilter, onFilterChange, title }) => {
+            const [isOpen, setIsOpen] = useState(false);
+            const [searchTerm, setSearchTerm] = useState("");
+            
+            // Valores únicos ordenados
+            const uniqueValues = useMemo(() => {
+                const values = new Set();
+                data.forEach(item => {
+                    const val = item[columnKey] ? String(item[columnKey]) : "(Vacío)";
+                    values.add(val);
+                });
+                return Array.from(values).sort();
+            }, [data, columnKey]);
+
+            const filteredValues = uniqueValues.filter(v => v.toLowerCase().includes(searchTerm.toLowerCase()));
+            const [tempSelected, setTempSelected] = useState(new Set(currentFilter || []));
+
+            useEffect(() => {
+                if (isOpen) {
+                    setTempSelected(new Set(currentFilter || []));
+                    setSearchTerm("");
+                }
+            }, [isOpen, currentFilter]);
+
+            const toggleValue = (val) => {
+                const newSet = new Set(tempSelected);
+                if (newSet.has(val)) newSet.delete(val);
+                else newSet.add(val);
+                setTempSelected(newSet);
+            };
+
+            const handleApply = () => {
+                onFilterChange(columnKey, tempSelected.size > 0 ? Array.from(tempSelected) : null);
+                setIsOpen(false);
+            };
+
+            const handleSelectAll = () => setTempSelected(new Set(filteredValues));
+            const handleClear = () => setTempSelected(new Set());
+
+            const isActive = currentFilter && currentFilter.length > 0;
+
+            return (
+                <div className="flex items-center justify-between gap-1 relative group">
+                    <span className="truncate">{title}</span>
+                    <button 
+                        onClick={(e) => { e.stopPropagation(); setIsOpen(!isOpen); }} 
+                        className={`p-1 rounded hover:bg-slate-200 transition-colors ${isActive ? 'text-blue-600 bg-blue-50' : 'text-slate-400 opacity-0 group-hover:opacity-100 focus:opacity-100'}`}
+                    >
+                        <Filter size={14} fill={isActive ? "currentColor" : "none"} />
+                    </button>
+                    
+                    {isOpen && (
+                        <>
+                            <div className="fixed inset-0 z-40 cursor-default" onClick={() => setIsOpen(false)}></div>
+                            <div className="absolute top-full right-0 mt-1 w-56 bg-white rounded-lg shadow-xl border border-slate-200 z-50 p-3 text-left">
+                                <div className="mb-2">
+                                    <input 
+                                        type="text" 
+                                        placeholder="Buscar..." 
+                                        className="w-full px-2 py-1 text-xs border rounded mb-2 focus:border-blue-500 outline-none text-slate-700"
+                                        value={searchTerm}
+                                        onChange={e => setSearchTerm(e.target.value)}
+                                        onClick={(e) => e.stopPropagation()}
+                                    />
+                                    <div className="flex justify-between mb-2 text-[10px]">
+                                        <button onClick={handleSelectAll} className="text-blue-600 hover:underline">Todos</button>
+                                        <button onClick={handleClear} className="text-slate-500 hover:underline">Ninguno</button>
+                                    </div>
+                                </div>
+                                <div className="max-h-40 overflow-y-auto mb-3 border rounded p-1 bg-slate-50">
+                                    {filteredValues.map(val => (
+                                        <label key={val} className="flex items-center gap-2 p-1 hover:bg-slate-100 rounded cursor-pointer text-xs text-slate-600">
+                                            <input 
+                                                type="checkbox" 
+                                                checked={tempSelected.has(val)} 
+                                                onChange={() => toggleValue(val)}
+                                                className="rounded text-blue-600 focus:ring-blue-500"
+                                            />
+                                            <span className="truncate">{val}</span>
+                                        </label>
+                                    ))}
+                                    {filteredValues.length === 0 && <div className="text-xs text-slate-400 p-2 text-center">Sin resultados</div>}
+                                </div>
+                                <div className="flex justify-end gap-2">
+                                    <button onClick={() => setIsOpen(false)} className="px-2 py-1 text-xs bg-gray-100 hover:bg-gray-200 rounded text-slate-700">Cancelar</button>
+                                    <button onClick={handleApply} className="px-2 py-1 text-xs bg-blue-600 hover:bg-blue-700 rounded text-white font-medium">Aplicar</button>
+                                </div>
+                            </div>
+                        </>
+                    )}
+                </div>
+            );
+        };
+
         const ConfirmModal = ({ isOpen, onClose, onConfirm }) => {
             if (!isOpen) return null;
             return (
@@ -459,6 +553,7 @@
             const [regData, setRegData] = useState([]); 
             const [activeTab, setActiveTab] = useState("dashboard"); 
             const [filter, setFilter] = useState("TODOS");
+            const [columnFilters, setColumnFilters] = useState({}); // NUEVO: Filtros por Columna
             const [expandedRows, setExpandedRows] = useState({}); 
             const [manualEdits, setManualEdits] = useState({});
             
@@ -666,6 +761,7 @@
                 // Para limpiar, guardamos arrays vacíos
                 saveToCloud([], [], {});
                 setMatrixData([]); setRegData([]); setManualEdits({}); setUploadStats(null); setFilter("TODOS"); setExpandedRows({});
+                setColumnFilters({});
                 if (fileInputRef.current) fileInputRef.current.value = "";
                 if (regInputRef.current) regInputRef.current.value = "";
                 setIsDeleteModalOpen(false);
@@ -716,6 +812,13 @@
                 setRegData(newRegData);
                 // Save Reg Data + Edits (null Matrix to skip saving it)
                 saveToCloud(null, newRegData, null);
+            };
+
+            const handleColumnFilterChange = (key, values) => {
+                setColumnFilters(prev => ({
+                    ...prev,
+                    [key]: values
+                }));
             };
 
             const calculateState = (item, edit) => {
@@ -890,115 +993,33 @@
                 return Object.values(stats);
             }, [matrixData, manualEdits]);
 
-            // --- CARGA DE ARCHIVOS ---
-            const handleMatrixUpload = (e) => { 
-                const file = e.target.files[0]; 
-                if(!file) return; 
-                const reader = new FileReader(); 
-                reader.onload = (ev) => { 
-                    const rawText = ev.target.result.replace(/\r/g, '');
-                    const lines = rawText.split('\n').filter(l => l.trim().length > 0);
-                    const newData = []; 
-                    const del = lines[0].includes(';') ? ';' : ','; 
-                    const headers = parseCSVLine(lines[0], del).map(h => h.toUpperCase());
-                    
-                    const idx = {
-                        tag: headers.findIndex(h => h === 'TAG'), spec: headers.findIndex(h => h.includes('ESPECIALIDAD') || h === 'ESP'), desc: headers.findIndex(h => h.includes('DESC') && !h.includes('SIS')),
-                        sis: headers.findIndex(h => h === 'SISTEMA' || h === 'SIS'), sisDesc: headers.findIndex(h => h.includes('DESC') && h.includes('SIS')), sub: headers.findIndex(h => h.includes('SUB') && !h.includes('DESC')),
-                        subDesc: headers.findIndex(h => h.includes('DESC') && h.includes('SUB')), skid: headers.findIndex(h => h === 'SKID'), alm: headers.findIndex(h => h === 'ALMACEN' || h === 'ALM'),
-                        calib: headers.findIndex(h => h.includes('CALIBRAR')), prov: headers.findIndex(h => h.includes('PROVISION')), cTot: headers.indexOf('CANTREGTOT') !== -1 ? headers.indexOf('CANTREGTOT') : headers.findIndex(h => h.includes('CANTREG') && h.includes('TOT')),
-                        cReal: headers.indexOf('CANTREGREALIZADOS') !== -1 ? headers.indexOf('CANTREGREALIZADOS') : headers.findIndex(h => h.includes('CANTREG') && h.includes('REAL')), est1: headers.indexOf('ESTADO_1') !== -1 ? headers.indexOf('ESTADO_1') : headers.findIndex(h => h.includes('ESTADO_1')), est2: headers.indexOf('ESTADO_2') !== -1 ? headers.indexOf('ESTADO_2') : headers.findIndex(h => h.includes('ESTADO_2'))
-                    };
-                    lines.forEach((r, i) => { 
-                        if (i === 0) return; 
-                        const c = parseCSVLine(r, del);
-                        const tagVal = cleanStr(c[idx.tag]);
-                        if(tagVal && tagVal.toUpperCase() !== "TAG" && !tagVal.toUpperCase().includes("DESCRIPCION")) {
-                            newData.push({
-                                especialidad: cleanStr(c[idx.spec]), tag: tagVal, descripcion: cleanStr(c[idx.desc]), sistema: cleanStr(c[idx.sis]), descSistema: cleanStr(c[idx.sisDesc]),
-                                subsistema: cleanStr(c[idx.sub]), descSubsistema: cleanStr(c[idx.subDesc]), skid: cleanStr(c[idx.skid]), almacen: cleanStr(c[idx.alm]),
-                                aCalibrar: cleanStr(c[idx.calib]), provision: cleanStr(c[idx.prov]), cantRegTot: cleanStr(c[idx.cTot]) || "0", cantRegReal: cleanStr(c[idx.cReal]) || "0", estado1: cleanStr(c[idx.est1]), estado2: cleanStr(c[idx.est2])
-                            });
-                        } 
-                    }); 
-                    let modCount = 0; let newCount = 0;
-                    const currentMap = new Map(matrixData.map(d => [d.tag, d]));
-                    newData.forEach(newItem => { const currentItem = currentMap.get(newItem.tag); if (!currentItem) newCount++; else if (newItem.skid !== currentItem.skid || newItem.almacen !== currentItem.almacen) modCount++; });
-                    setPendingData(newData);
-                    setChangeStats({ total: newData.length, newItems: newCount, modified: modCount });
-                    setIsApprovalModalOpen(true);
-                }; 
-                reader.readAsText(file); 
-            };
-            
-            const handleRegUpload = (e) => {
-                const file = e.target.files[0];
-                if(!file) return;
-                const reader = new FileReader();
-                reader.onload = (ev) => {
-                    const rawText = ev.target.result.replace(/\r/g, '');
-                    const lines = rawText.split('\n').filter(l => l.trim().length > 0);
-                    const newData = [];
-                    const del = lines[0].includes(';') ? ';' : ',';
-                    const headers = parseCSVLine(lines[0], del).map(h => h.toUpperCase());
-                    const idx = { tag: headers.findIndex(h => h === 'TAG'), skid: headers.findIndex(h => h.includes('SKID')), ubic: headers.findIndex(h => h.includes('UBICA') && !h.includes('REGISTRO')), lab: headers.findIndex(h => h.includes('LABT') || h.includes('CALIB')), fCalib: headers.findIndex(h => h.includes('FECHA') && h.includes('CALIB')), estReg: headers.findIndex(h => h.includes('ESTADO') && h.includes('REGIST')), fGen: headers.findIndex(h => h.includes('GENERADO')), fPres: headers.findIndex(h => h.includes('PRESENTADO')), fDev: headers.findIndex(h => h.includes('DEVOLUCION')), ubicReg: headers.findIndex(h => h.includes('REGISTRO')), montado: headers.findIndex(h => h === 'MONTADO'), prov: headers.findIndex(h => h === 'PROVISION' || h.includes('PROVISION')) };
-                    lines.forEach((r, i) => {
-                        if (i === 0) return;
-                        const c = parseCSVLine(r, del);
-                        if(c[idx.tag]) {
-                            newData.push({ tag: cleanStr(c[idx.tag]), skid: cleanStr(c[idx.skid]), ubicacion: cleanStr(c[idx.ubic]), lab: cleanStr(c[idx.lab]), fCalib: normalizeDate(c[idx.fCalib]), estadoReg: cleanStr(c[idx.estReg]), fGen: normalizeDate(c[idx.fGen]), fPres: normalizeDate(c[idx.fPres]), fDev: normalizeDate(c[idx.fDev]), ubicReg: cleanStr(c[idx.ubicReg]), montado: cleanStr(c[idx.montado]), provision: idx.prov !== -1 ? cleanStr(c[idx.prov]) : "Sin Dato" });
-                        }
-                    });
-                    
-                    setRegData(newData);
-                    saveToCloud(null, newData, null);
-                    
-                    setUploadStats({type:'Registro Instrumentos', total:newData.length});
-                    setIsSuccessModalOpen(true);
-                    setActiveTab('dashboard'); 
-                };
-                reader.readAsText(file);
-            };
+            const filteredList = useMemo(() => {
+                // 1. Filtro Global (Select de arriba)
+                let data = filter === "TODOS" ? flatData : flatData.filter(d => d.estadoDoc === filter || d.ubicacion === filter);
 
-            const confirmMatrixLoad = () => {
-                if (pendingData) {
-                    setMatrixData(pendingData);
-                    saveToCloud(pendingData, null, {}); 
-
-                    setUploadStats({type:'Matriz Actualizada', total: pendingData.length});
-                    setManualEdits({}); 
-                    setIsApprovalModalOpen(false);
-                    setIsSuccessModalOpen(true);
-                    setActiveTab('systems');
-                }
-            };
-
-            const downloadExport = () => {
-                let csvContent = "data:text/csv;charset=utf-8,TAG;ESTADO;DOC_TOT;DOC_REAL\n";
-                matrixData.forEach(row => {
-                    const edit = manualEdits[row.tag];
-                    const state = calculateState(row, edit);
-                    csvContent += `${row.tag};${state};${edit?.cantRegTot||row.cantRegTot};${edit?.cantRegReal||row.cantRegReal}\n`;
+                // 2. Filtros por Columna
+                Object.keys(columnFilters).forEach(key => {
+                    const selectedValues = columnFilters[key];
+                    if (selectedValues && selectedValues.length > 0) {
+                        data = data.filter(item => {
+                            const val = item[key] ? String(item[key]) : "(Vacío)";
+                            return selectedValues.includes(val);
+                        });
+                    }
                 });
-                const encodedUri = encodeURI(csvContent);
-                const link = document.createElement("a");
-                link.setAttribute("href", encodedUri);
-                link.setAttribute("download", "avance_obra.csv");
-                document.body.appendChild(link);
-                link.click();
-            };
+
+                return data;
+            }, [flatData, filter, columnFilters]);
 
             const docStatusCounts = useMemo(() => {
-                const counts = flatData.reduce((acc, curr) => { const st = curr.estadoDoc || "PENDIENTE"; acc[st] = (acc[st] || 0) + 1; return acc; }, {});
+                const counts = filteredList.reduce((acc, curr) => { const st = curr.estadoDoc || "PENDIENTE"; acc[st] = (acc[st] || 0) + 1; return acc; }, {});
                 return Object.keys(counts).map(key => ({ name: key, value: counts[key] }));
-            }, [flatData]);
+            }, [filteredList]);
 
             const registryStatusCounts = useMemo(() => {
-                const counts = flatData.reduce((acc, curr) => { const st = curr.ubicacionRegistro || "PENDIENTE"; acc[st] = (acc[st] || 0) + 1; return acc; }, {});
+                const counts = filteredList.reduce((acc, curr) => { const st = curr.ubicacionRegistro || "PENDIENTE"; acc[st] = (acc[st] || 0) + 1; return acc; }, {});
                 return Object.keys(counts).map(key => ({ name: key, value: counts[key] }));
-            }, [flatData]);
-
-            const filteredList = filter === "TODOS" ? flatData : flatData.filter(d => d.estadoDoc === filter || d.ubicacion === filter);
+            }, [filteredList]);
 
             // --- RENDER LOGIC ---
             if (!user) {
@@ -1174,18 +1195,18 @@
                                     <table className="w-full text-sm text-left text-slate-600">
                                         <thead className="text-xs text-slate-700 uppercase bg-slate-100 sticky top-0">
                                             <tr>
-                                                <th className="px-6 py-3">TAG</th>
-                                                <th className="px-2 py-3 w-32">Lab</th>
-                                                <th className="px-2 py-3 w-32">Calibración</th>
-                                                <th className="px-2 py-3 w-32">Generado</th>
-                                                <th className="px-2 py-3 w-32">Presentado</th>
-                                                <th className="px-2 py-3 w-32">Devolución</th>
-                                                <th className="px-6 py-3">Estado Doc.</th>
-                                                <th className="px-2 py-3 w-32">Ubicación Física</th>
-                                                <th className="px-2 py-3 w-32">Provisión</th>
-                                                <th className="px-6 py-3 font-bold text-right">Estado del registro</th>
-                                                <th className="px-2 py-3 text-center w-32">Montado</th>
-                                                <th className="px-2 py-3 text-center w-32">Skid</th>
+                                                <th className="px-6 py-3"><TableFilter title="TAG" columnKey="tag" data={flatData} currentFilter={columnFilters.tag} onFilterChange={handleColumnFilterChange} /></th>
+                                                <th className="px-2 py-3 w-32"><TableFilter title="LAB" columnKey="proveedor" data={flatData} currentFilter={columnFilters.proveedor} onFilterChange={handleColumnFilterChange} /></th>
+                                                <th className="px-2 py-3 w-32"><TableFilter title="Calibración" columnKey="fCalib" data={flatData} currentFilter={columnFilters.fCalib} onFilterChange={handleColumnFilterChange} /></th>
+                                                <th className="px-2 py-3 w-32"><TableFilter title="Generado" columnKey="fechaGen" data={flatData} currentFilter={columnFilters.fechaGen} onFilterChange={handleColumnFilterChange} /></th>
+                                                <th className="px-2 py-3 w-32"><TableFilter title="Presentado" columnKey="fechaPres" data={flatData} currentFilter={columnFilters.fechaPres} onFilterChange={handleColumnFilterChange} /></th>
+                                                <th className="px-2 py-3 w-32"><TableFilter title="Devolución" columnKey="fechaDev" data={flatData} currentFilter={columnFilters.fechaDev} onFilterChange={handleColumnFilterChange} /></th>
+                                                <th className="px-6 py-3"><TableFilter title="Estado Doc." columnKey="estadoDoc" data={flatData} currentFilter={columnFilters.estadoDoc} onFilterChange={handleColumnFilterChange} /></th>
+                                                <th className="px-2 py-3 w-32"><TableFilter title="Ubicación Física" columnKey="ubicacionFisica" data={flatData} currentFilter={columnFilters.ubicacionFisica} onFilterChange={handleColumnFilterChange} /></th>
+                                                <th className="px-2 py-3 w-32"><TableFilter title="Provisión" columnKey="provision" data={flatData} currentFilter={columnFilters.provision} onFilterChange={handleColumnFilterChange} /></th>
+                                                <th className="px-6 py-3 font-bold text-right"><TableFilter title="Estado del registro" columnKey="ubicacionRegistro" data={flatData} currentFilter={columnFilters.ubicacionRegistro} onFilterChange={handleColumnFilterChange} /></th>
+                                                <th className="px-2 py-3 text-center w-32"><TableFilter title="Montado" columnKey="montado" data={flatData} currentFilter={columnFilters.montado} onFilterChange={handleColumnFilterChange} /></th>
+                                                <th className="px-2 py-3 text-center w-32"><TableFilter title="Skid" columnKey="skid" data={flatData} currentFilter={columnFilters.skid} onFilterChange={handleColumnFilterChange} /></th>
                                             </tr>
                                         </thead>
                                         <tbody className="divide-y divide-slate-100">
