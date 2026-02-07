@@ -62,7 +62,8 @@
         import React, { useState, useMemo, useRef, useEffect } from 'react';
         import { createRoot } from 'react-dom/client';
         import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, PieChart, Pie, Cell, ResponsiveContainer, Label, LabelList } from 'recharts';
-        import { AlertCircle, CheckCircle, Clock, Activity, Upload, Trash2, HardHat, Download, X, AlertTriangle, Target, Layers, FileSpreadsheet, LayoutDashboard, ChevronDown, ChevronRight, Boxes, PlayCircle, Wrench, Zap, Hammer, FileWarning, Package, Truck, ClipboardCheck, Edit3, Save, Eye, EyeOff, FileCheck, RefreshCw, CalendarDays, Search, FileText, MapPin, Box, LogIn, User, Shield, LogOut, Database, Settings, Filter } from 'lucide-react';
+        // FIX: Eliminamos 'Filter' de la importación para evitar conflictos o errores de carga, usaremos un SVG nativo.
+        import { AlertCircle, CheckCircle, Clock, Activity, Upload, Trash2, HardHat, Download, X, AlertTriangle, Target, Layers, FileSpreadsheet, LayoutDashboard, ChevronDown, ChevronRight, Boxes, PlayCircle, Wrench, Zap, Hammer, FileWarning, Package, Truck, ClipboardCheck, Edit3, Save, Eye, EyeOff, FileCheck, RefreshCw, CalendarDays, Search, FileText, MapPin, Box, LogIn, User, Shield, LogOut, Database, Settings } from 'lucide-react';
         
         // --- FIREBASE IMPORTS ---
         import { initializeApp } from "firebase/app";
@@ -174,6 +175,24 @@
         const COLORS = { blue: "#3b82f6", green: "#10b981", orange: "#f97316", red: "#ef4444", yellow: "#eab308", purple: "#a855f7", indigo: "#6366f1", gray: "#64748b", teal: "#14b8a6", pink: "#db2777", cyan: "#06b6d4" };
         const COLORS_LIST = Object.values(COLORS);
 
+        // --- ICONO FILTRO NATIVO (Para evitar errores de importación) ---
+        const FilterIconSvg = ({ size = 14, fill = "none", className = "" }) => (
+            <svg 
+                xmlns="http://www.w3.org/2000/svg" 
+                width={size} 
+                height={size} 
+                viewBox="0 0 24 24" 
+                fill={fill} 
+                stroke="currentColor" 
+                strokeWidth="2" 
+                strokeLinecap="round" 
+                strokeLinejoin="round" 
+                className={className}
+            >
+                <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3" />
+            </svg>
+        );
+
         // --- COMPONENTES UI (MODALES & FILTROS) ---
         const TableFilter = ({ columnKey, data, currentFilter, onFilterChange, title }) => {
             const [isOpen, setIsOpen] = useState(false);
@@ -182,10 +201,12 @@
             // Valores únicos ordenados
             const uniqueValues = useMemo(() => {
                 const values = new Set();
-                data.forEach(item => {
-                    const val = item[columnKey] ? String(item[columnKey]) : "(Vacío)";
-                    values.add(val);
-                });
+                if (Array.isArray(data)) {
+                    data.forEach(item => {
+                        const val = item[columnKey] ? String(item[columnKey]) : "(Vacío)";
+                        values.add(val);
+                    });
+                }
                 return Array.from(values).sort();
             }, [data, columnKey]);
 
@@ -223,13 +244,13 @@
                         onClick={(e) => { e.stopPropagation(); setIsOpen(!isOpen); }} 
                         className={`p-1 rounded hover:bg-slate-200 transition-colors ${isActive ? 'text-blue-600 bg-blue-50' : 'text-slate-400 opacity-0 group-hover:opacity-100 focus:opacity-100'}`}
                     >
-                        <Filter size={14} fill={isActive ? "currentColor" : "none"} />
+                        <FilterIconSvg size={14} fill={isActive ? "currentColor" : "none"} />
                     </button>
                     
                     {isOpen && (
                         <>
                             <div className="fixed inset-0 z-40 cursor-default" onClick={() => setIsOpen(false)}></div>
-                            <div className="absolute top-full right-0 mt-1 w-56 bg-white rounded-lg shadow-xl border border-slate-200 z-50 p-3 text-left">
+                            <div className="absolute top-full right-0 mt-1 w-56 bg-white rounded-lg shadow-xl border border-slate-200 z-50 p-3 text-left font-normal normal-case">
                                 <div className="mb-2">
                                     <input 
                                         type="text" 
@@ -928,22 +949,6 @@
                 const sortedData = Object.values(stats).sort((a, b) => a.name.localeCompare(b.name));
                 return { data: sortedData, keys: Array.from(provisions).sort() };
             }, [flatData]);
-
-            const uniqueLocations = useMemo(() => {
-                const locs = new Set();
-                regData.forEach(d => {
-                    if(d.ubicacion && d.ubicacion.trim() !== '') locs.add(d.ubicacion.trim());
-                });
-                return Array.from(locs).sort();
-            }, [regData]);
-
-            const uniqueProvisions = useMemo(() => {
-                const provs = new Set();
-                regData.forEach(d => {
-                    if(d.provision && d.provision.trim() !== '') provs.add(d.provision.trim());
-                });
-                return Array.from(provs).sort();
-            }, [regData]);
 
             const skidCounts = useMemo(() => {
                 const counts = { ON: 0, OFF: 0 };
