@@ -62,7 +62,6 @@
         import React, { useState, useMemo, useRef, useEffect } from 'react';
         import { createRoot } from 'react-dom/client';
         import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, PieChart, Pie, Cell, ResponsiveContainer, Label, LabelList } from 'recharts';
-        // FIX: Eliminamos 'Filter' de la importación para evitar conflictos o errores de carga, usaremos un SVG nativo.
         import { AlertCircle, CheckCircle, Clock, Activity, Upload, Trash2, HardHat, Download, X, AlertTriangle, Target, Layers, FileSpreadsheet, LayoutDashboard, ChevronDown, ChevronRight, Boxes, PlayCircle, Wrench, Zap, Hammer, FileWarning, Package, Truck, ClipboardCheck, Edit3, Save, Eye, EyeOff, FileCheck, RefreshCw, CalendarDays, Search, FileText, MapPin, Box, LogIn, User, Shield, LogOut, Database, Settings } from 'lucide-react';
         
         // --- FIREBASE IMPORTS ---
@@ -175,7 +174,7 @@
         const COLORS = { blue: "#3b82f6", green: "#10b981", orange: "#f97316", red: "#ef4444", yellow: "#eab308", purple: "#a855f7", indigo: "#6366f1", gray: "#64748b", teal: "#14b8a6", pink: "#db2777", cyan: "#06b6d4" };
         const COLORS_LIST = Object.values(COLORS);
 
-        // --- ICONO FILTRO NATIVO (Para evitar errores de importación) ---
+        // --- ICONO FILTRO NATIVO ---
         const FilterIconSvg = ({ size = 14, fill = "none", className = "" }) => (
             <svg 
                 xmlns="http://www.w3.org/2000/svg" 
@@ -198,7 +197,6 @@
             const [isOpen, setIsOpen] = useState(false);
             const [searchTerm, setSearchTerm] = useState("");
             
-            // Valores únicos ordenados
             const uniqueValues = useMemo(() => {
                 const values = new Set();
                 if (Array.isArray(data)) {
@@ -428,7 +426,6 @@
                         <Icon size={compact ? 20 : 24} color={color} />
                     </div>
                 </div>
-                {/* BARRA DE PROGRESO AGREGADA */}
                 {percentage && (
                     <div className="w-full bg-slate-100 rounded-full h-1.5 mt-3">
                         <div 
@@ -566,7 +563,7 @@
             const [role, setRole] = useState('viewer'); // 'viewer' | 'admin'
             const [loadingAuth, setLoadingAuth] = useState(true);
             const [loadingData, setLoadingData] = useState(false);
-            const [isSaving, setIsSaving] = useState(false); // NUEVO ESTADO: isSaving
+            const [isSaving, setIsSaving] = useState(false); 
             const [errorMsg, setErrorMsg] = useState('');
 
             // Data State
@@ -574,7 +571,7 @@
             const [regData, setRegData] = useState([]); 
             const [activeTab, setActiveTab] = useState("dashboard"); 
             const [filter, setFilter] = useState("TODOS");
-            const [columnFilters, setColumnFilters] = useState({}); // NUEVO: Filtros por Columna
+            const [columnFilters, setColumnFilters] = useState({}); 
             const [expandedRows, setExpandedRows] = useState({}); 
             const [manualEdits, setManualEdits] = useState({});
             
@@ -601,6 +598,150 @@
             const app = useMemo(() => isConfigured ? initializeApp(config) : null, [config, isConfigured]);
             const auth = useMemo(() => app ? getAuth(app) : null, [app]);
             const db = useMemo(() => app ? getFirestore(app) : null, [app]);
+
+            // --- FUNCIONES DEFINIDAS ANTES DEL RENDER ---
+
+            // Definir confirmMatrixLoad ANTES de su uso en el render y antes de otros métodos que lo referencien
+            const confirmMatrixLoad = () => {
+                if (pendingData) {
+                    setMatrixData(pendingData);
+                    saveToCloud(pendingData, null, {}); 
+
+                    setUploadStats({type:'Matriz Actualizada', total: pendingData.length});
+                    setManualEdits({}); 
+                    setIsApprovalModalOpen(false);
+                    setIsSuccessModalOpen(true);
+                    setActiveTab('systems');
+                }
+            };
+
+            const handleMatrixUpload = (e) => { 
+                const file = e.target.files[0]; 
+                if(!file) return; 
+                const reader = new FileReader(); 
+                reader.onload = (ev) => { 
+                    const rawText = ev.target.result.replace(/\r/g, '');
+                    const lines = rawText.split('\n').filter(l => l.trim().length > 0);
+                    const newData = []; 
+                    const del = lines[0].includes(';') ? ';' : ','; 
+                    const headers = parseCSVLine(lines[0], del).map(h => h.toUpperCase());
+                    
+                    const idx = {
+                        tag: headers.findIndex(h => h === 'TAG'), spec: headers.findIndex(h => h.includes('ESPECIALIDAD') || h === 'ESP'), desc: headers.findIndex(h => h.includes('DESC') && !h.includes('SIS')),
+                        sis: headers.findIndex(h => h === 'SISTEMA' || h === 'SIS'), sisDesc: headers.findIndex(h => h.includes('DESC') && h.includes('SIS')), sub: headers.findIndex(h => h.includes('SUB') && !h.includes('DESC')),
+                        subDesc: headers.findIndex(h => h.includes('DESC') && h.includes('SUB')), skid: headers.findIndex(h => h === 'SKID'), alm: headers.findIndex(h => h === 'ALMACEN' || h === 'ALM'),
+                        calib: headers.findIndex(h => h.includes('CALIBRAR')), prov: headers.findIndex(h => h.includes('PROVISION')), cTot: headers.indexOf('CANTREGTOT') !== -1 ? headers.indexOf('CANTREGTOT') : headers.findIndex(h => h.includes('CANTREG') && h.includes('TOT')),
+                        cReal: headers.indexOf('CANTREGREALIZADOS') !== -1 ? headers.indexOf('CANTREGREALIZADOS') : headers.findIndex(h => h.includes('CANTREG') && h.includes('REAL')), est1: headers.indexOf('ESTADO_1') !== -1 ? headers.indexOf('ESTADO_1') : headers.findIndex(h => h.includes('ESTADO_1')), est2: headers.indexOf('ESTADO_2') !== -1 ? headers.indexOf('ESTADO_2') : headers.findIndex(h => h.includes('ESTADO_2'))
+                    };
+                    lines.forEach((r, i) => { 
+                        if (i === 0) return; 
+                        const c = parseCSVLine(r, del);
+                        const tagVal = cleanStr(c[idx.tag]);
+                        if(tagVal && tagVal.toUpperCase() !== "TAG" && !tagVal.toUpperCase().includes("DESCRIPCION")) {
+                            newData.push({
+                                especialidad: cleanStr(c[idx.spec]), tag: tagVal, descripcion: cleanStr(c[idx.desc]), sistema: cleanStr(c[idx.sis]), descSistema: cleanStr(c[idx.sisDesc]),
+                                subsistema: cleanStr(c[idx.sub]), descSubsistema: cleanStr(c[idx.subDesc]), skid: cleanStr(c[idx.skid]), almacen: cleanStr(c[idx.alm]),
+                                aCalibrar: cleanStr(c[idx.calib]), provision: cleanStr(c[idx.prov]), cantRegTot: cleanStr(c[idx.cTot]) || "0", cantRegReal: cleanStr(c[idx.cReal]) || "0", estado1: cleanStr(c[idx.est1]), estado2: cleanStr(c[idx.est2])
+                            });
+                        } 
+                    }); 
+                    let modCount = 0; let newCount = 0;
+                    const currentMap = new Map(matrixData.map(d => [d.tag, d]));
+                    newData.forEach(newItem => { const currentItem = currentMap.get(newItem.tag); if (!currentItem) newCount++; else if (newItem.skid !== currentItem.skid || newItem.almacen !== currentItem.almacen) modCount++; });
+                    setPendingData(newData);
+                    setChangeStats({ total: newData.length, newItems: newCount, modified: modCount });
+                    setIsApprovalModalOpen(true);
+                }; 
+                reader.readAsText(file); 
+            };
+            
+            const handleRegUpload = (e) => {
+                const file = e.target.files[0];
+                if(!file) return;
+                const reader = new FileReader();
+                reader.onload = (ev) => {
+                    const rawText = ev.target.result.replace(/\r/g, '');
+                    const lines = rawText.split('\n').filter(l => l.trim().length > 0);
+                    const newData = [];
+                    const del = lines[0].includes(';') ? ';' : ',';
+                    const headers = parseCSVLine(lines[0], del).map(h => h.toUpperCase());
+                    const idx = { tag: headers.findIndex(h => h === 'TAG'), skid: headers.findIndex(h => h.includes('SKID')), ubic: headers.findIndex(h => h.includes('UBICA') && !h.includes('REGISTRO')), lab: headers.findIndex(h => h.includes('LABT') || h.includes('CALIB')), fCalib: headers.findIndex(h => h.includes('FECHA') && h.includes('CALIB')), estReg: headers.findIndex(h => h.includes('ESTADO') && h.includes('REGIST')), fGen: headers.findIndex(h => h.includes('GENERADO')), fPres: headers.findIndex(h => h.includes('PRESENTADO')), fDev: headers.findIndex(h => h.includes('DEVOLUCION')), ubicReg: headers.findIndex(h => h.includes('REGISTRO')), montado: headers.findIndex(h => h === 'MONTADO'), prov: headers.findIndex(h => h === 'PROVISION' || h.includes('PROVISION')) };
+                    lines.forEach((r, i) => {
+                        if (i === 0) return;
+                        const c = parseCSVLine(r, del);
+                        if(c[idx.tag]) {
+                            newData.push({ tag: cleanStr(c[idx.tag]), skid: cleanStr(c[idx.skid]), ubicacion: cleanStr(c[idx.ubic]), lab: cleanStr(c[idx.lab]), fCalib: normalizeDate(c[idx.fCalib]), estadoReg: cleanStr(c[idx.estReg]), fGen: normalizeDate(c[idx.fGen]), fPres: normalizeDate(c[idx.fPres]), fDev: normalizeDate(c[idx.fDev]), ubicReg: cleanStr(c[idx.ubicReg]), montado: cleanStr(c[idx.montado]), provision: idx.prov !== -1 ? cleanStr(c[idx.prov]) : "Sin Dato" });
+                        }
+                    });
+                    
+                    setRegData(newData);
+                    saveToCloud(null, newData, null);
+                    
+                    setUploadStats({type:'Registro Instrumentos', total:newData.length});
+                    setIsSuccessModalOpen(true);
+                    setActiveTab('dashboard'); 
+                };
+                reader.readAsText(file);
+            };
+
+            const downloadExport = () => {
+                let csvContent = "data:text/csv;charset=utf-8,TAG;ESTADO;DOC_TOT;DOC_REAL\n";
+                matrixData.forEach(row => {
+                    const edit = manualEdits[row.tag];
+                    const state = calculateState(row, edit);
+                    csvContent += `${row.tag};${state};${edit?.cantRegTot||row.cantRegTot};${edit?.cantRegReal||row.cantRegReal}\n`;
+                });
+                const encodedUri = encodeURI(csvContent);
+                const link = document.createElement("a");
+                link.setAttribute("href", encodedUri);
+                link.setAttribute("download", "avance_obra.csv");
+                document.body.appendChild(link);
+                link.click();
+            };
+
+            const downloadMatrix = () => {
+                let csvContent = "data:text/csv;charset=utf-8,TAG;ESPECIALIDAD;DESCRIPCION;SISTEMA;SUBSISTEMA;SKID;ALMACEN;A_CALIBRAR;CANT_REG_TOT;CANT_REG_REAL;ESTADO_CALCULADO\n";
+                matrixData.forEach(row => {
+                    const edit = manualEdits[row.tag];
+                    const state = calculateState(row, edit);
+                    const skid = edit?.skid !== undefined ? edit.skid : row.skid;
+                    const alm = edit?.almacen !== undefined ? edit.almacen : row.almacen;
+                    const calib = edit?.aCalibrar !== undefined ? edit.aCalibrar : row.aCalibrar;
+                    const cTot = edit?.cantRegTot !== undefined ? edit.cantRegTot : row.cantRegTot;
+                    const cReal = edit?.cantRegReal !== undefined ? edit.cantRegReal : row.cantRegReal;
+                    
+                    const line = [
+                        row.tag, row.especialidad, row.descripcion, row.sistema, row.subsistema,
+                        skid, alm, calib, cTot, cReal, state
+                    ].map(f => cleanStr(f)).join(';');
+                    csvContent += line + "\n";
+                });
+                const encodedUri = encodeURI(csvContent);
+                const link = document.createElement("a");
+                link.setAttribute("href", encodedUri);
+                link.setAttribute("download", "matriz_abm.csv");
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+            };
+
+            const downloadRegistry = () => {
+                let csvContent = "data:text/csv;charset=utf-8,TAG;SKID;UBICACION;LAB;F_CALIB;ESTADO_REG;F_GEN;F_PRES;F_DEV;UBICACION_REG;MONTADO;PROVISION\n";
+                regData.forEach(row => {
+                    const line = [
+                        row.tag, row.skid, row.ubicacion, row.lab, row.fCalib, row.estadoReg,
+                        row.fGen, row.fPres, row.fDev, row.ubicReg, row.montado, row.provision
+                    ].map(f => cleanStr(f)).join(';');
+                    csvContent += line + "\n";
+                });
+                const encodedUri = encodeURI(csvContent);
+                const link = document.createElement("a");
+                link.setAttribute("href", encodedUri);
+                link.setAttribute("download", "registro_instrumentos.csv");
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+            };
 
             // --- 1. INITIALIZE FIREBASE AUTH ---
             useEffect(() => {
@@ -1025,6 +1166,22 @@
                 const counts = filteredList.reduce((acc, curr) => { const st = curr.ubicacionRegistro || "PENDIENTE"; acc[st] = (acc[st] || 0) + 1; return acc; }, {});
                 return Object.keys(counts).map(key => ({ name: key, value: counts[key] }));
             }, [filteredList]);
+
+            const uniqueLocations = useMemo(() => {
+                const locs = new Set();
+                regData.forEach(d => {
+                    if(d.ubicacion && d.ubicacion.trim() !== '') locs.add(d.ubicacion.trim());
+                });
+                return Array.from(locs).sort();
+            }, [regData]);
+
+            const uniqueProvisions = useMemo(() => {
+                const provs = new Set();
+                regData.forEach(d => {
+                    if(d.provision && d.provision.trim() !== '') provs.add(d.provision.trim());
+                });
+                return Array.from(provs).sort();
+            }, [regData]);
 
             // --- RENDER LOGIC ---
             if (!user) {
