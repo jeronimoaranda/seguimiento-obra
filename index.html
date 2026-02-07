@@ -22,7 +22,7 @@
             }
         }
     </script>
-    <!-- FIX: Versión específica de Babel -->
+    <!-- Babel -->
     <script src="https://unpkg.com/@babel/standalone@7.23.9/babel.min.js"></script>
 
     <style>
@@ -62,7 +62,7 @@
         import React, { useState, useMemo, useRef, useEffect } from 'react';
         import { createRoot } from 'react-dom/client';
         import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, PieChart, Pie, Cell, ResponsiveContainer, Label, LabelList } from 'recharts';
-        import { AlertCircle, CheckCircle, Clock, Activity, Upload, Trash2, HardHat, Download, X, AlertTriangle, Target, Layers, FileSpreadsheet, LayoutDashboard, ChevronDown, ChevronRight, Boxes, PlayCircle, Wrench, Zap, Hammer, FileWarning, Package, Truck, ClipboardCheck, Edit3, Save, Eye, EyeOff, FileCheck, RefreshCw, CalendarDays, Search, FileText, MapPin, Box, LogIn, User, Shield, LogOut, Database, Settings, Filter, XCircle } from 'lucide-react';
+        import { AlertCircle, CheckCircle, Clock, Activity, Upload, Trash2, HardHat, Download, X, AlertTriangle, Target, Layers, FileSpreadsheet, LayoutDashboard, ChevronDown, ChevronRight, Boxes, PlayCircle, Wrench, Zap, Hammer, FileWarning, Package, Truck, ClipboardCheck, Edit3, Save, Eye, EyeOff, FileCheck, RefreshCw, CalendarDays, Search, FileText, MapPin, Box, LogIn, User, Shield, LogOut, Database, Settings, XCircle } from 'lucide-react';
         
         // --- FIREBASE IMPORTS ---
         import { initializeApp } from "firebase/app";
@@ -174,6 +174,11 @@
         const COLORS = { blue: "#3b82f6", green: "#10b981", orange: "#f97316", red: "#ef4444", yellow: "#eab308", purple: "#a855f7", indigo: "#6366f1", gray: "#64748b", teal: "#14b8a6", pink: "#db2777", cyan: "#06b6d4" };
         const COLORS_LIST = Object.values(COLORS);
 
+        // --- ICONO FILTRO NATIVO ---
+        const FilterIconSvg = ({ size = 14, fill = "none", className = "" }) => (
+            <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill={fill} stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></svg>
+        );
+
         // --- COMPONENTES UI (FILTRO DE COLUMNA) ---
         const TableFilter = ({ columnKey, data, currentFilter, onFilterChange, title }) => {
             const [isOpen, setIsOpen] = useState(false);
@@ -220,13 +225,12 @@
 
             return (
                 <div className="flex items-center justify-between gap-1 relative group">
-                    <span className="truncate">{title}</span>
+                    <span className="truncate cursor-pointer hover:text-blue-600" onClick={(e) => { e.stopPropagation(); setIsOpen(!isOpen); }}>{title}</span>
                     <button 
                         onClick={(e) => { e.stopPropagation(); setIsOpen(!isOpen); }} 
                         className={`p-1 rounded hover:bg-slate-200 transition-colors ${isActive ? 'text-blue-600 bg-blue-50' : 'text-slate-400 opacity-0 group-hover:opacity-100 focus:opacity-100'}`}
                     >
-                        {/* Usamos SVG nativo para evitar problemas de importación */}
-                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill={isActive ? "currentColor" : "none"} stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></svg>
+                        <FilterIconSvg size={14} fill={isActive ? "currentColor" : "none"} />
                     </button>
                     
                     {isOpen && (
@@ -272,7 +276,6 @@
             );
         };
 
-        // --- COMPONENTES UI (MODALES) ---
         const ConfirmModal = ({ isOpen, onClose, onConfirm }) => {
             if (!isOpen) return null;
             return (
@@ -294,7 +297,7 @@
             return (
                 <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[60] p-4">
                     <div className="bg-white rounded-lg shadow-xl max-w-sm w-full p-6 animate-enter">
-                        <div className="flex items-center gap-3 mb-4 text-green-600"><FileCheck size={24} /><h3 className="text-lg font-bold">Operación Exitosa</h3></div>
+                        <div className="flex items-center gap-3 mb-4 text-green-600"><CheckCircle size={24} /><h3 className="text-lg font-bold">Operación Exitosa</h3></div>
                         <p className="text-gray-600 mb-6 text-sm">{message}</p>
                         <div className="flex justify-end gap-3">
                             <button onClick={onClose} className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded text-sm">Aceptar</button>
@@ -325,7 +328,7 @@
             );
         };
 
-        // --- LOGIN COMPONENT UNIFICADO ---
+        // --- LOGIN COMPONENT ---
         const LoginScreen = ({ onLogin, loading, isConfigured }) => {
             const [email, setEmail] = useState('');
             const [password, setPassword] = useState('');
@@ -339,12 +342,10 @@
                     setError('La aplicación no está configurada para conectarse a Firebase.');
                     return;
                 }
-                
                 if (!email || !password) {
                     setError('Por favor complete todos los campos');
                     return;
                 }
-                
                 onLogin({ email, password, isRegistering });
             };
 
@@ -355,17 +356,14 @@
                             <h1 className="text-2xl font-bold mb-2">Control de Obra</h1>
                             <p className="text-blue-100 text-sm">Plataforma Colaborativa en Tiempo Real</p>
                         </div>
-                        
                         {!isConfigured && (
                             <div className="bg-yellow-50 border-b border-yellow-200 p-4 text-yellow-800 text-xs">
                                 <strong className="flex items-center gap-2 mb-1"><Settings size={14}/> Configuración Requerida</strong>
-                                Para usar esta app fuera del editor (ej: GitHub), debes editar el archivo <code>index.html</code> y agregar tus credenciales de Firebase en la función <code>getFirebaseConfig</code>.
+                                Para usar esta app fuera del editor, configura las credenciales en getFirebaseConfig.
                             </div>
                         )}
-
                         <div className="p-8">
                             <h2 className="text-xl font-bold text-slate-700 mb-6 text-center">Iniciar Sesión</h2>
-
                             <form onSubmit={handleSubmit} className="flex flex-col gap-4">
                                 <div>
                                     <label className="text-xs font-bold text-slate-500 uppercase">Email</label>
@@ -379,15 +377,12 @@
                                     <input type="checkbox" id="regCheck" checked={isRegistering} onChange={e => setIsRegistering(e.target.checked)} className="rounded text-blue-600"/>
                                     <label htmlFor="regCheck" className="text-xs text-slate-500 select-none">Crear cuenta nueva si no existe</label>
                                 </div>
-
                                 {error && <div className="bg-red-50 text-red-600 p-3 rounded text-sm flex items-center gap-2"><AlertCircle size={16}/> {error}</div>}
-
                                 <button disabled={loading || !isConfigured} type="submit" className={`mt-4 py-2 rounded font-bold shadow-lg transform active:scale-95 transition-all flex justify-center items-center gap-2 ${!isConfigured ? 'bg-gray-300 cursor-not-allowed text-gray-500' : 'bg-blue-600 hover:bg-blue-700 text-white'}`}>
                                     {loading ? <RefreshCw className="animate-spin"/> : <LogIn size={18} />}
                                     {isRegistering ? 'Registrar y Entrar' : 'Iniciar Sesión'}
                                 </button>
                             </form>
-                            
                             <div className="mt-6 text-xs text-center text-slate-400 border-t border-slate-100 pt-4">
                                 <p>El sistema detectará automáticamente tu perfil (Admin/Visualizador) según tu correo.</p>
                             </div>
@@ -413,10 +408,7 @@
                 </div>
                 {percentage && (
                     <div className="w-full bg-slate-100 rounded-full h-1.5 mt-3">
-                        <div 
-                            className="h-1.5 rounded-full transition-all duration-500" 
-                            style={{ width: `${percentage}%`, backgroundColor: color }}
-                        ></div>
+                        <div className="h-1.5 rounded-full transition-all duration-500" style={{ width: `${percentage}%`, backgroundColor: color }}></div>
                     </div>
                 )}
                 {subtext && <p className="text-xs text-slate-400 mt-2 z-10 relative">{subtext}</p>}
@@ -432,98 +424,48 @@
             );
         };
 
-        // --- COMPONENTES TABLA ---
-        const TagEditRow = ({ tagItem, onEdit, skidOptions, almacenOptions, isReadOnly }) => {
-            let rowColor = "hover:bg-slate-50";
-            if (tagItem.calculatedStatus === "INSTALADO") rowColor = "bg-green-50/60";
-            else if (tagItem.calculatedStatus === "EN PROCESO") rowColor = "bg-yellow-50/60";
-
-            return (
-                <tr className={`border-b border-slate-100 transition-colors ${rowColor}`}>
-                    <td className="px-4 py-2 font-medium text-slate-800 w-32">{tagItem.tag}</td>
-                    <td className="px-4 py-2 text-slate-500 text-[10px] truncate max-w-[150px]" title={tagItem.desc}>{tagItem.desc}</td>
-                    
-                    <td className="px-2 py-1">
-                        <select disabled={isReadOnly} className="select-edit" value={tagItem.skid} onChange={(e) => onEdit(tagItem.tag, 'skid', e.target.value)}>
-                            <option value="">-</option>
-                            {skidOptions.map(opt => <option key={opt} value={opt}>{opt}</option>)}
-                        </select>
-                    </td>
-                    
-                    <td className="px-2 py-1">
-                        <select disabled={isReadOnly} className="select-edit" value={tagItem.almacen} onChange={(e) => onEdit(tagItem.tag, 'almacen', e.target.value)}>
-                            <option value="">-</option>
-                            {almacenOptions.map(opt => <option key={opt} value={opt}>{opt}</option>)}
-                        </select>
-                    </td>
-                    
-                    <td className="px-2 py-1 text-center w-20">
-                        <select disabled={isReadOnly} className="select-edit text-center" value={tagItem.aCalibrar} onChange={(e) => onEdit(tagItem.tag, 'aCalibrar', e.target.value)}>
-                            <option value="0">NO</option>
-                            <option value="1">SI</option>
-                        </select>
-                    </td>
-                    
-                    <td className="px-2 py-1 w-16"><input disabled={isReadOnly} type="number" className="input-edit text-center" value={tagItem.cantRegTot} onChange={(e) => onEdit(tagItem.tag, 'cantRegTot', e.target.value)} placeholder="0"/></td>
-                    <td className="px-2 py-1 w-16"><input disabled={isReadOnly} type="number" className="input-edit text-center" value={tagItem.cantRegReal} onChange={(e) => onEdit(tagItem.tag, 'cantRegReal', e.target.value)} placeholder="0"/></td>
-
-                    <td className="px-2 py-1 text-center w-32">
-                         <span className={`text-[10px] font-bold px-2 py-1 rounded border ${tagItem.calculatedStatus === 'INSTALADO' ? 'text-green-700 bg-green-100 border-green-200' : tagItem.calculatedStatus === 'EN PROCESO' ? 'text-yellow-700 bg-yellow-100 border-yellow-200' : 'text-slate-400 bg-slate-100 border-slate-200'}`}>
-                            {tagItem.calculatedStatus}
-                         </span>
-                    </td>
-                </tr>
-            );
-        };
-
-        const SpecialtyGroup = ({ specialtyName, tags, onEdit, skidOptions, almacenOptions, isReadOnly }) => {
-            const [isExpanded, setIsExpanded] = useState(false);
-            const total = tags.length;
-            const mounted = tags.filter(t => t.calculatedStatus === "INSTALADO").length;
-            const percent = total > 0 ? ((mounted / total) * 100).toFixed(0) : 0;
-            const iconMap = { "Instrumentación": <Activity size={14} className="text-blue-500"/>, "Electricidad": <Zap size={14} className="text-yellow-500"/>, "Mecánica": <Wrench size={14} className="text-gray-500"/>, "Piping": <Target size={14} className="text-indigo-500"/>, "Civil": <Hammer size={14} className="text-orange-500"/> };
-            
-            return (
-                <div className="border border-slate-200 rounded mb-2 overflow-hidden bg-white shadow-sm">
-                    <div className="flex justify-between items-center p-2 px-3 cursor-pointer bg-slate-50 hover:bg-slate-100 transition-colors" onClick={() => setIsExpanded(!isExpanded)}>
-                        <div className="flex items-center gap-2">
-                            {isExpanded ? <ChevronDown size={14} className="text-slate-400"/> : <ChevronRight size={14} className="text-slate-400"/>}
-                            <span className="font-bold text-slate-700 text-xs flex items-center gap-2">{iconMap[specialtyName] || <Layers size={14}/>} {specialtyName}</span>
-                        </div>
-                        <div className="flex items-center gap-3">
-                            <span className="text-[10px] text-slate-500 font-medium">{mounted}/{total} Inst.</span>
-                            <div className="w-16 bg-gray-200 rounded-full h-1.5"><div className={`h-1.5 rounded-full ${percent == 100 ? 'bg-green-500' : 'bg-blue-500'}`} style={{ width: `${percent}%` }}></div></div>
-                        </div>
-                    </div>
-                    {isExpanded && (
-                        <div className="overflow-x-auto">
-                            <table className="w-full text-[10px] text-left">
-                                <thead className="bg-slate-100 text-slate-500 uppercase border-y border-slate-200">
-                                    <tr>
-                                        <th className="px-4 py-2 font-semibold">TAG</th>
-                                        <th className="px-4 py-2 font-semibold">Descripción</th>
-                                        <th className="px-2 py-2 font-semibold w-24">Skid</th>
-                                        <th className="px-2 py-2 font-semibold w-24">Almacén</th>
-                                        <th className="px-2 py-2 font-semibold text-center w-16">Calib?</th>
-                                        <th className="px-2 py-2 font-semibold text-center w-16">R. Tot</th>
-                                        <th className="px-2 py-2 font-semibold text-center w-16">R. Real</th>
-                                        <th className="px-2 py-2 font-semibold text-center w-32">Estado</th>
-                                    </tr>
-                                </thead>
-                                <tbody>{tags.map((tagItem) => <TagEditRow key={tagItem.tag} tagItem={tagItem} onEdit={onEdit} skidOptions={skidOptions} almacenOptions={almacenOptions} isReadOnly={isReadOnly} />)}</tbody>
-                            </table>
-                        </div>
-                    )}
-                </div>
-            );
-        };
-
         const ExpandableRow = ({ sys, isExpanded, onToggle, onEdit, skidOptions, almacenOptions, isReadOnly }) => {
             const groupedTags = useMemo(() => {
                 const groups = {};
                 sys.tags.forEach(t => { const spec = t.specialty || "Sin Especialidad"; if (!groups[spec]) groups[spec] = []; groups[spec].push(t); });
                 return groups;
             }, [sys.tags]);
+
+            // --- REPETICIÓN DEL COMPONENTE TAGEDITROW (INTERNO PARA EVITAR PROBLEMAS DE REFERENCIA) ---
+            // Podría estar fuera, pero lo dejamos aquí por simplicidad del diff
+            const InternalTagEditRow = ({ tagItem, onEdit, skidOptions, almacenOptions, isReadOnly }) => {
+                let rowColor = "hover:bg-slate-50";
+                if (tagItem.calculatedStatus === "INSTALADO") rowColor = "bg-green-50/60";
+                else if (tagItem.calculatedStatus === "EN PROCESO") rowColor = "bg-yellow-50/60";
+                return (
+                    <tr className={`border-b border-slate-100 transition-colors ${rowColor}`}>
+                        <td className="px-4 py-2 font-medium text-slate-800 w-32">{tagItem.tag}</td>
+                        <td className="px-4 py-2 text-slate-500 text-[10px] truncate max-w-[150px]" title={tagItem.desc}>{tagItem.desc}</td>
+                        <td className="px-2 py-1">
+                            <select disabled={isReadOnly} className="select-edit" value={tagItem.skid} onChange={(e) => onEdit(tagItem.tag, 'skid', e.target.value)}>
+                                <option value="">-</option>{skidOptions.map(opt => <option key={opt} value={opt}>{opt}</option>)}
+                            </select>
+                        </td>
+                        <td className="px-2 py-1">
+                            <select disabled={isReadOnly} className="select-edit" value={tagItem.almacen} onChange={(e) => onEdit(tagItem.tag, 'almacen', e.target.value)}>
+                                <option value="">-</option>{almacenOptions.map(opt => <option key={opt} value={opt}>{opt}</option>)}
+                            </select>
+                        </td>
+                        <td className="px-2 py-1 text-center w-20">
+                            <select disabled={isReadOnly} className="select-edit text-center" value={tagItem.aCalibrar} onChange={(e) => onEdit(tagItem.tag, 'aCalibrar', e.target.value)}>
+                                <option value="0">NO</option><option value="1">SI</option>
+                            </select>
+                        </td>
+                        <td className="px-2 py-1 w-16"><input disabled={isReadOnly} type="number" className="input-edit text-center" value={tagItem.cantRegTot} onChange={(e) => onEdit(tagItem.tag, 'cantRegTot', e.target.value)} placeholder="0"/></td>
+                        <td className="px-2 py-1 w-16"><input disabled={isReadOnly} type="number" className="input-edit text-center" value={tagItem.cantRegReal} onChange={(e) => onEdit(tagItem.tag, 'cantRegReal', e.target.value)} placeholder="0"/></td>
+                        <td className="px-2 py-1 text-center w-32">
+                            <span className={`text-[10px] font-bold px-2 py-1 rounded border ${tagItem.calculatedStatus === 'INSTALADO' ? 'text-green-700 bg-green-100 border-green-200' : tagItem.calculatedStatus === 'EN PROCESO' ? 'text-yellow-700 bg-yellow-100 border-yellow-200' : 'text-slate-400 bg-slate-100 border-slate-200'}`}>
+                                {tagItem.calculatedStatus}
+                            </span>
+                        </td>
+                    </tr>
+                );
+            };
 
             return (
                 <>
@@ -535,7 +477,40 @@
                         <td className="px-6 py-4"><div className="flex items-center gap-3"><span className="text-xs font-bold w-8 text-right">{sys.percent}%</span><ProgressBar current={sys.mountedTags} total={sys.totalTags} color={parseFloat(sys.percent) === 100 ? 'bg-green-600' : parseFloat(sys.percent) > 50 ? 'bg-blue-600' : 'bg-orange-400'} /></div></td>
                     </tr>
                     {isExpanded && (
-                        <tr><td colSpan="5" className="p-4 bg-slate-50 border-b border-slate-200 shadow-inner"><div className="pl-6"><h4 className="text-xs font-bold text-slate-400 uppercase mb-3 flex items-center gap-2 tracking-wider"><Boxes size={14}/> Detalle por Especialidad (ABM)</h4>{Object.keys(groupedTags).sort().map(specName => (<SpecialtyGroup key={specName} specialtyName={specName} tags={groupedTags[specName]} onEdit={onEdit} skidOptions={skidOptions} almacenOptions={almacenOptions} isReadOnly={isReadOnly} />))}</div></td></tr>
+                        <tr>
+                            <td colSpan="5" className="p-4 bg-slate-50 border-b border-slate-200 shadow-inner">
+                                <div className="pl-6">
+                                    <h4 className="text-xs font-bold text-slate-400 uppercase mb-3 flex items-center gap-2 tracking-wider"><Boxes size={14}/> Detalle por Especialidad (ABM)</h4>
+                                    {Object.keys(groupedTags).sort().map(specName => (
+                                        <div key={specName} className="border border-slate-200 rounded mb-2 overflow-hidden bg-white shadow-sm">
+                                            <div className="flex justify-between items-center p-2 px-3 bg-slate-50">
+                                                <span className="font-bold text-slate-700 text-xs flex items-center gap-2">{specName}</span>
+                                                <span className="text-[10px] text-slate-500 font-medium">{groupedTags[specName].filter(t => t.calculatedStatus === "INSTALADO").length}/{groupedTags[specName].length} Inst.</span>
+                                            </div>
+                                            <div className="overflow-x-auto">
+                                                <table className="w-full text-[10px] text-left">
+                                                    <thead className="bg-slate-100 text-slate-500 uppercase border-y border-slate-200">
+                                                        <tr>
+                                                            <th className="px-4 py-2 font-semibold">TAG</th>
+                                                            <th className="px-4 py-2 font-semibold">Descripción</th>
+                                                            <th className="px-2 py-2 font-semibold w-24">Skid</th>
+                                                            <th className="px-2 py-2 font-semibold w-24">Almacén</th>
+                                                            <th className="px-2 py-2 font-semibold text-center w-16">Calib?</th>
+                                                            <th className="px-2 py-2 font-semibold text-center w-16">R. Tot</th>
+                                                            <th className="px-2 py-2 font-semibold text-center w-16">R. Real</th>
+                                                            <th className="px-2 py-2 font-semibold text-center w-32">Estado</th>
+                                                        </tr>
+                                                    </thead>
+                                                    <tbody>
+                                                        {groupedTags[specName].map((tagItem) => <InternalTagEditRow key={tagItem.tag} tagItem={tagItem} onEdit={onEdit} skidOptions={skidOptions} almacenOptions={almacenOptions} isReadOnly={isReadOnly} />)}
+                                                    </tbody>
+                                                </table>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            </td>
+                        </tr>
                     )}
                 </>
             );
@@ -543,24 +518,22 @@
 
         // --- APP PRINCIPAL ---
         function InstrumentDashboard() {
-            // Firebase State
+            // State
             const [user, setUser] = useState(null);
-            const [role, setRole] = useState('viewer'); // 'viewer' | 'admin'
+            const [role, setRole] = useState('viewer');
             const [loadingAuth, setLoadingAuth] = useState(true);
             const [loadingData, setLoadingData] = useState(false);
             const [isSaving, setIsSaving] = useState(false); 
             const [errorMsg, setErrorMsg] = useState('');
 
-            // Data State
             const [matrixData, setMatrixData] = useState([]);
             const [regData, setRegData] = useState([]); 
             const [activeTab, setActiveTab] = useState("dashboard"); 
             const [filter, setFilter] = useState("TODOS");
-            const [columnFilters, setColumnFilters] = useState({}); // NUEVO: Filtros por Columna
+            const [columnFilters, setColumnFilters] = useState({});
             const [expandedRows, setExpandedRows] = useState({}); 
             const [manualEdits, setManualEdits] = useState({});
             
-            // UI Refs & State
             const fileInputRef = useRef(null);
             const regInputRef = useRef(null); 
             const [uploadStats, setUploadStats] = useState(null);
@@ -570,35 +543,245 @@
             const [pendingData, setPendingData] = useState(null);
             const [changeStats, setChangeStats] = useState(null);
             const [hideDeleted, setHideDeleted] = useState(true); 
-            
-            // UI Dropdown state
             const [showExportMenu, setShowExportMenu] = useState(false);
 
-            const [skidOptions, setSkidOptions] = useState([]);
-            const [almacenOptions, setAlmacenOptions] = useState([]);
-
-            // Firebase Globals - Init Seguro
-            const { config, appId, isConfigured } = useMemo(() => getFirebaseConfig(), []);
+            // 1. CALCULOS DERIVADOS DE DATA (Mover al principio para evitar ReferenceError)
             
+            const flatData = useMemo(() => {
+                return regData.map(item => {
+                     let status = "PENDIENTE";
+                     if (item.fDev && item.fDev.trim() !== "") status = "FINALIZADO";
+                     else if (item.fPres && item.fPres.trim() !== "") status = "EN INSPECCIÓN";
+                     else if (item.fGen && item.fGen.trim() !== "") status = "EN LABORATORIO";
+                     else if (item.fCalib && item.fCalib.trim() !== "") status = "CALIBRADO";
+                     const estadoRegFisico = (item.ubicReg && item.ubicReg.trim() !== "") ? item.ubicReg : "PENDIENTE";
+                     const ubicacionFisicaReal = (item.ubicacion && item.ubicacion.trim() !== "") ? item.ubicacion : "Sin Dato";
+                     const provision = (item.provision && item.provision.trim() !== "") ? item.provision : "Sin Dato";
+                     const skidStatus = (item.skid && item.skid.trim() !== "") ? item.skid : "Sin Dato";
+
+                     return {
+                         tag: item.tag, ubicacionFisica: ubicacionFisicaReal, ubicacionRegistro: estadoRegFisico, proveedor: item.lab || "Sin Prov.", 
+                         estadoDoc: status, fechaGen: item.fGen, fechaPres: item.fPres, fechaDev: item.fDev, 
+                         fCalib: item.fCalib,
+                         montado: item.montado, provision: provision, skid: skidStatus
+                     };
+                });
+            }, [regData]);
+
+            const uniqueLabs = useMemo(() => {
+                const labs = new Set();
+                regData.forEach(d => { if(d.lab && d.lab.trim() !== '') labs.add(d.lab.trim()); });
+                return Array.from(labs).sort();
+            }, [regData]);
+
+            const uniqueLocations = useMemo(() => {
+                const locs = new Set();
+                regData.forEach(d => { if(d.ubicacion && d.ubicacion.trim() !== '') locs.add(d.ubicacion.trim()); });
+                return Array.from(locs).sort();
+            }, [regData]);
+
+            const uniqueProvisions = useMemo(() => {
+                const provs = new Set();
+                regData.forEach(d => { if(d.provision && d.provision.trim() !== '') provs.add(d.provision.trim()); });
+                return Array.from(provs).sort();
+            }, [regData]);
+
+            const skidOptions = useMemo(() => {
+                const opts = new Set();
+                matrixData.forEach(item => { if (item.skid) opts.add(item.skid.trim()); });
+                return Array.from(opts).sort();
+            }, [matrixData]);
+
+            const almacenOptions = useMemo(() => {
+                const opts = new Set();
+                matrixData.forEach(item => { if (item.almacen) opts.add(item.almacen.trim()); });
+                opts.add("EN OBRA");
+                return Array.from(opts).sort();
+            }, [matrixData]);
+
+            // Firebase Config
+            const { config, appId, isConfigured } = useMemo(() => getFirebaseConfig(), []);
             const app = useMemo(() => isConfigured ? initializeApp(config) : null, [config, isConfigured]);
             const auth = useMemo(() => app ? getAuth(app) : null, [app]);
             const db = useMemo(() => app ? getFirestore(app) : null, [app]);
 
-            // --- FUNCIONES DEFINIDAS ANTES DEL RENDER ---
+            // --- EFFECT: AUTH ---
+            useEffect(() => {
+                if(!auth) { setLoadingAuth(false); return; }
+                setLoadingAuth(false);
+                const unsubscribe = onAuthStateChanged(auth, (u) => {
+                    setUser(u);
+                    setLoadingAuth(false);
+                    if (u) {
+                        if (u.email && u.email.toLowerCase().startsWith('admin')) setRole('admin');
+                        else setRole('viewer');
+                    }
+                });
+                return () => unsubscribe();
+            }, [auth]);
 
-            const confirmMatrixLoad = () => {
-                if (pendingData) {
-                    setMatrixData(pendingData);
-                    saveToCloud(pendingData, null, {}); 
+            // --- EFFECT: DATA SYNC ---
+            useEffect(() => {
+                if (!user || !db || !isConfigured) return;
+                setLoadingData(true);
+                setErrorMsg('');
+                const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'app_metadata', 'main');
+                const unsub = onSnapshot(docRef, async (snap) => {
+                    if (snap.exists()) {
+                        const meta = snap.data();
+                        if (meta.edits) setManualEdits(JSON.parse(meta.edits));
+                        if (meta.matrixChunkCount > 0) {
+                            try { const mData = await fetchLargeData(db, appId, 'matrix_chunks', meta.matrixChunkCount); setMatrixData(mData); } catch(e) { console.error(e); }
+                        } else setMatrixData([]);
+                        if (meta.registryChunkCount > 0) {
+                            try { const rData = await fetchLargeData(db, appId, 'registry_chunks', meta.registryChunkCount); setRegData(rData); } catch(e) { console.error(e); }
+                        } else setRegData([]);
+                    } else {
+                        setMatrixData([]); setRegData([]); setManualEdits({});
+                    }
+                    setLoadingData(false);
+                }, (err) => {
+                    setLoadingData(false);
+                    if(err.code === 'permission-denied') setErrorMsg('Acceso denegado. Verifica las reglas de Firestore.');
+                    else setErrorMsg(`Error de conexión: ${err.message}`);
+                });
+                return () => unsub();
+            }, [user, db, appId, isConfigured]);
 
-                    setUploadStats({type:'Matriz Actualizada', total: pendingData.length});
-                    setManualEdits({}); 
-                    setIsApprovalModalOpen(false);
-                    setIsSuccessModalOpen(true);
-                    setActiveTab('systems');
-                }
+            // --- HANDLERS ---
+            const saveToCloud = async (newMatrix, newReg, newEdits) => {
+                if (role !== 'admin' || !db) return;
+                setIsSaving(true);
+                try {
+                    const finalMatrix = newMatrix || matrixData;
+                    const finalReg = newReg || regData;
+                    const finalEdits = newEdits || manualEdits;
+                    let mCount = 0;
+                    if(newMatrix) mCount = await saveLargeData(db, appId, 'matrix_chunks', JSON.stringify(finalMatrix));
+                    let rCount = 0;
+                    if(newReg) rCount = await saveLargeData(db, appId, 'registry_chunks', JSON.stringify(finalReg));
+                    const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'app_metadata', 'main');
+                    const updatePayload = { edits: JSON.stringify(finalEdits), lastUpdated: new Date().toISOString(), updatedBy: user.email || 'Admin' };
+                    if (newMatrix) updatePayload.matrixChunkCount = mCount;
+                    if (newReg) updatePayload.registryChunkCount = rCount;
+                    await setDoc(docRef, updatePayload, { merge: true });
+                } catch (e) { alert("Error guardando: " + e.message); } finally { setIsSaving(false); }
             };
 
+            const handleLogin = async (creds) => {
+                if(!auth) return;
+                setLoadingAuth(true);
+                try {
+                    if (creds.isRegistering) await createUserWithEmailAndPassword(auth, creds.email, creds.password);
+                    else await signInWithEmailAndPassword(auth, creds.email, creds.password);
+                } catch (err) { alert("Error de autenticación: " + err.message); } finally { setLoadingAuth(false); }
+            };
+
+            const handleLogout = () => { if(auth) signOut(auth); setUser(null); setMatrixData([]); setRegData([]); };
+            const performClearData = () => { saveToCloud([], [], {}); setMatrixData([]); setRegData([]); setManualEdits({}); setIsDeleteModalOpen(false); };
+            const toggleRow = (id) => setExpandedRows(prev => ({...prev, [id]: !prev[id]}));
+
+            const handleTagEdit = (tag, field, value) => {
+                if (role !== 'admin') return;
+                const updatedEdits = { ...manualEdits };
+                let newEditsForTag = { ...(updatedEdits[tag] || {}), [field]: value };
+                if (field === 'cantRegReal') {
+                    const item = matrixData.find(d => d.tag === tag);
+                    const tot = safeParseInt(newEditsForTag.cantRegTot !== undefined ? newEditsForTag.cantRegTot : (item?.cantRegTot || 0));
+                    const real = safeParseInt(value);
+                    if (tot > 0 && real >= tot) newEditsForTag.almacen = "EN OBRA";
+                }
+                updatedEdits[tag] = newEditsForTag;
+                setManualEdits(updatedEdits);
+                saveToCloud(null, null, updatedEdits);
+            };
+            
+            const handleRegEdit = (tag, field, value) => {
+                if (role !== 'admin') return;
+                const newRegData = regData.map(item => {
+                    if(item.tag === tag) {
+                        let newState = item.estadoReg; 
+                        if (field === 'fDev' && value) newState = "FINALIZADO";
+                        else if (field === 'fPres' && value) newState = "EN INSPECCIÓN";
+                        else if (field === 'fGen' && value) newState = "EN LABORATORIO";
+                        else if (field === 'fCalib' && value) newState = "CALIBRADO";
+                        return { ...item, [field]: value, estadoReg: newState };
+                    }
+                    return item;
+                });
+                setRegData(newRegData);
+                saveToCloud(null, newRegData, null);
+            };
+
+            const handleColumnFilterChange = (key, values) => setColumnFilters(prev => ({ ...prev, [key]: values }));
+
+            const calculateState = (item, edit) => {
+                const tot = safeParseInt(edit?.cantRegTot !== undefined ? edit.cantRegTot : item.cantRegTot);
+                const real = safeParseInt(edit?.cantRegReal !== undefined ? edit.cantRegReal : item.cantRegReal);
+                if (tot > 0 && real >= tot) return "INSTALADO";
+                if (real > 0 && real < tot) return "EN PROCESO";
+                return "PENDIENTE";
+            };
+
+            // Filtrados
+            const filteredMatrixData = useMemo(() => {
+                if (!hideDeleted) return matrixData;
+                return matrixData.filter(item => {
+                    const est = (item.estado1 || "").toUpperCase();
+                    return !est.includes("ELIMINA");
+                });
+            }, [matrixData, hideDeleted]);
+
+            const filteredList = useMemo(() => {
+                let data = filter === "TODOS" ? flatData : flatData.filter(d => d.estadoDoc === filter || d.ubicacion === filter);
+                Object.keys(columnFilters).forEach(key => {
+                    const selectedValues = columnFilters[key];
+                    if (selectedValues && selectedValues.length > 0) {
+                        data = data.filter(item => {
+                            const val = item[key] ? String(item[key]) : "(Vacío)";
+                            return selectedValues.includes(val);
+                        });
+                    }
+                });
+                return data;
+            }, [flatData, filter, columnFilters]);
+
+            // Stats Graficos
+            const docStatusCounts = useMemo(() => {
+                const counts = filteredList.reduce((acc, curr) => { const st = curr.estadoDoc || "PENDIENTE"; acc[st] = (acc[st] || 0) + 1; return acc; }, {});
+                return Object.keys(counts).map(key => ({ name: key, value: counts[key] }));
+            }, [filteredList]);
+
+            const registryStatusCounts = useMemo(() => {
+                const counts = filteredList.reduce((acc, curr) => { const st = curr.ubicacionRegistro || "PENDIENTE"; acc[st] = (acc[st] || 0) + 1; return acc; }, {});
+                return Object.keys(counts).map(key => ({ name: key, value: counts[key] }));
+            }, [filteredList]);
+
+            const physicalLocationStats = useMemo(() => {
+                const stats = {};
+                const provisions = new Set();
+                flatData.forEach(item => {
+                    const loc = item.ubicacionFisica;
+                    const prov = item.provision;
+                    provisions.add(prov);
+                    if (!stats[loc]) stats[loc] = { name: loc };
+                    stats[loc][prov] = (stats[loc][prov] || 0) + 1;
+                });
+                const sortedData = Object.values(stats).sort((a, b) => a.name.localeCompare(b.name));
+                return { data: sortedData, keys: Array.from(provisions).sort() };
+            }, [flatData]);
+
+            const skidCounts = useMemo(() => {
+                const counts = { ON: 0, OFF: 0 };
+                flatData.forEach(d => {
+                    const val = (d.skid || "").toUpperCase().trim();
+                    if (val === 'ON') counts.ON++;
+                    if (val === 'OFF') counts.OFF++;
+                });
+                return counts;
+            }, [flatData]);
+
+            // Handlers de Upload (reutilizan funciones de parseo definidas arriba)
             const handleMatrixUpload = (e) => { 
                 const file = e.target.files[0]; 
                 if(!file) return; 
@@ -609,7 +792,6 @@
                     const newData = []; 
                     const del = lines[0].includes(';') ? ';' : ','; 
                     const headers = parseCSVLine(lines[0], del).map(h => h.toUpperCase());
-                    
                     const idx = {
                         tag: headers.findIndex(h => h === 'TAG'), spec: headers.findIndex(h => h.includes('ESPECIALIDAD') || h === 'ESP'), desc: headers.findIndex(h => h.includes('DESC') && !h.includes('SIS')),
                         sis: headers.findIndex(h => h === 'SISTEMA' || h === 'SIS'), sisDesc: headers.findIndex(h => h.includes('DESC') && h.includes('SIS')), sub: headers.findIndex(h => h.includes('SUB') && !h.includes('DESC')),
@@ -657,10 +839,7 @@
                             newData.push({ tag: cleanStr(c[idx.tag]), skid: cleanStr(c[idx.skid]), ubicacion: cleanStr(c[idx.ubic]), lab: cleanStr(c[idx.lab]), fCalib: normalizeDate(c[idx.fCalib]), estadoReg: cleanStr(c[idx.estReg]), fGen: normalizeDate(c[idx.fGen]), fPres: normalizeDate(c[idx.fPres]), fDev: normalizeDate(c[idx.fDev]), ubicReg: cleanStr(c[idx.ubicReg]), montado: cleanStr(c[idx.montado]), provision: idx.prov !== -1 ? cleanStr(c[idx.prov]) : "Sin Dato" });
                         }
                     });
-                    
                     setRegData(newData);
-                    saveToCloud(null, newData, null);
-                    
                     setUploadStats({type:'Registro Instrumentos', total:newData.length});
                     setIsSuccessModalOpen(true);
                     setActiveTab('dashboard'); 
@@ -668,6 +847,18 @@
                 reader.readAsText(file);
             };
 
+            const confirmMatrixLoad = () => {
+                if (pendingData) {
+                    setMatrixData(pendingData);
+                    saveToCloud(pendingData, null, {}); 
+                    setUploadStats({type:'Matriz Actualizada', total: pendingData.length});
+                    setManualEdits({}); 
+                    setIsApprovalModalOpen(false);
+                    setIsSuccessModalOpen(true);
+                    setActiveTab('systems');
+                }
+            };
+            
             const downloadExport = () => {
                 let csvContent = "data:text/csv;charset=utf-8,TAG;ESTADO;DOC_TOT;DOC_REAL\n";
                 matrixData.forEach(row => {
@@ -683,475 +874,7 @@
                 link.click();
             };
 
-            const downloadMatrix = () => {
-                let csvContent = "data:text/csv;charset=utf-8,TAG;ESPECIALIDAD;DESCRIPCION;SISTEMA;SUBSISTEMA;SKID;ALMACEN;A_CALIBRAR;CANT_REG_TOT;CANT_REG_REAL;ESTADO_CALCULADO\n";
-                matrixData.forEach(row => {
-                    const edit = manualEdits[row.tag];
-                    const state = calculateState(row, edit);
-                    const skid = edit?.skid !== undefined ? edit.skid : row.skid;
-                    const alm = edit?.almacen !== undefined ? edit.almacen : row.almacen;
-                    const calib = edit?.aCalibrar !== undefined ? edit.aCalibrar : row.aCalibrar;
-                    const cTot = edit?.cantRegTot !== undefined ? edit.cantRegTot : row.cantRegTot;
-                    const cReal = edit?.cantRegReal !== undefined ? edit.cantRegReal : row.cantRegReal;
-                    
-                    const line = [
-                        row.tag, row.especialidad, row.descripcion, row.sistema, row.subsistema,
-                        skid, alm, calib, cTot, cReal, state
-                    ].map(f => cleanStr(f)).join(';');
-                    csvContent += line + "\n";
-                });
-                const encodedUri = encodeURI(csvContent);
-                const link = document.createElement("a");
-                link.setAttribute("href", encodedUri);
-                link.setAttribute("download", "matriz_abm.csv");
-                document.body.appendChild(link);
-                link.click();
-                document.body.removeChild(link);
-            };
-
-            const downloadRegistry = () => {
-                let csvContent = "data:text/csv;charset=utf-8,TAG;SKID;UBICACION;LAB;F_CALIB;ESTADO_REG;F_GEN;F_PRES;F_DEV;UBICACION_REG;MONTADO;PROVISION\n";
-                regData.forEach(row => {
-                    const line = [
-                        row.tag, row.skid, row.ubicacion, row.lab, row.fCalib, row.estadoReg,
-                        row.fGen, row.fPres, row.fDev, row.ubicReg, row.montado, row.provision
-                    ].map(f => cleanStr(f)).join(';');
-                    csvContent += line + "\n";
-                });
-                const encodedUri = encodeURI(csvContent);
-                const link = document.createElement("a");
-                link.setAttribute("href", encodedUri);
-                link.setAttribute("download", "registro_instrumentos.csv");
-                document.body.appendChild(link);
-                link.click();
-                document.body.removeChild(link);
-            };
-
-            // --- 1. INITIALIZE FIREBASE AUTH ---
-            useEffect(() => {
-                if(!auth) {
-                    setLoadingAuth(false);
-                    return;
-                }
-
-                // Autologin eliminado para evitar conflictos en entorno manual
-                setLoadingAuth(false);
-
-                const unsubscribe = onAuthStateChanged(auth, (u) => {
-                    setUser(u);
-                    setLoadingAuth(false);
-                    if (u) {
-                        // LÓGICA DE ROLES BASADA EN EMAIL (Simple Demo)
-                        // Si el email empieza con "admin", es admin.
-                        // En producción, esto debería ser vía Custom Claims o una colección 'users'
-                        if (u.email && u.email.toLowerCase().startsWith('admin')) {
-                            setRole('admin');
-                        } else {
-                            setRole('viewer');
-                        }
-                    }
-                });
-                return () => unsubscribe();
-            }, [auth]);
-
-            // --- 2. FIRESTORE DATA SYNC ---
-            useEffect(() => {
-                if (!user || !db || !isConfigured) return;
-                setLoadingData(true);
-                setErrorMsg('');
-                
-                // Escuchamos el documento "Metadata" principal para saber qué hay
-                const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'app_metadata', 'main');
-                
-                const unsub = onSnapshot(docRef, async (snap) => {
-                    if (snap.exists()) {
-                        const meta = snap.data();
-                        
-                        // Cargar Edits (son pequeños, viven en metadata)
-                        if (meta.edits) setManualEdits(JSON.parse(meta.edits));
-
-                        // Cargar Matrix (Si cambió el conteo, recargamos)
-                        if (meta.matrixChunkCount > 0) {
-                            try {
-                                const mData = await fetchLargeData(db, appId, 'matrix_chunks', meta.matrixChunkCount);
-                                setMatrixData(mData);
-                            } catch(e) { console.error("Error loading matrix chunks", e); }
-                        } else {
-                            setMatrixData([]);
-                        }
-
-                        // Cargar Registry
-                        if (meta.registryChunkCount > 0) {
-                            try {
-                                const rData = await fetchLargeData(db, appId, 'registry_chunks', meta.registryChunkCount);
-                                setRegData(rData);
-                            } catch(e) { console.error("Error loading registry chunks", e); }
-                        } else {
-                            setRegData([]);
-                        }
-
-                    } else {
-                        // DB vacía
-                        setMatrixData([]);
-                        setRegData([]);
-                        setManualEdits({});
-                    }
-                    setLoadingData(false);
-                }, (err) => {
-                    console.error("Error fetching data:", err);
-                    setLoadingData(false);
-                    if(err.code === 'permission-denied') {
-                        setErrorMsg('Acceso denegado. Verifica las reglas de Firestore.');
-                    } else {
-                        setErrorMsg(`Error de conexión: ${err.message}`);
-                    }
-                });
-
-                return () => unsub();
-            }, [user, db, appId, isConfigured]);
-
-            // --- 3. SAVE DATA HELPER ---
-            const saveToCloud = async (newMatrix, newReg, newEdits) => {
-                if (role !== 'admin' || !db) return;
-                setIsSaving(true); // INICIO BLOQUEO
-                try {
-                    // 1. Calcular nuevos datos o usar actuales
-                    const finalMatrix = newMatrix || matrixData;
-                    const finalReg = newReg || regData;
-                    const finalEdits = newEdits || manualEdits;
-
-                    // 2. Guardar chunks de Matrix
-                    let mCount = 0;
-                    if(newMatrix) {
-                        mCount = await saveLargeData(db, appId, 'matrix_chunks', JSON.stringify(finalMatrix));
-                    } else {
-                        // Si no estamos actualizando la matriz, necesitamos saber cuantos chunks hay actualmente.
-                        // Para simplificar, leemos del estado actual si no tenemos el conteo a mano,
-                        // pero idealmente 'saveToCloud' se llama cuando cambian cosas.
-                        // Si solo cambiamos edits, no re-guardamos la matriz gigante.
-                        // Hack: leemos el conteo previo si no cambiamos la matriz.
-                        // Mejor estrategia: Guardar solo lo que cambió.
-                    }
-
-                    // 3. Guardar chunks de Registry
-                    let rCount = 0;
-                    if(newReg) {
-                        rCount = await saveLargeData(db, appId, 'registry_chunks', JSON.stringify(finalReg));
-                    }
-
-                    // 4. Actualizar Metadata
-                    const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'app_metadata', 'main');
-                    
-                    // Necesitamos leer el meta actual para no perder los conteos si solo guardamos edits
-                    // pero estamos en un entorno async.
-                    // Estrategia segura: merge: true
-                    
-                    const updatePayload = {
-                        edits: JSON.stringify(finalEdits),
-                        lastUpdated: new Date().toISOString(),
-                        updatedBy: user.email || 'Admin'
-                    };
-
-                    if (newMatrix) updatePayload.matrixChunkCount = mCount;
-                    if (newReg) updatePayload.registryChunkCount = rCount;
-
-                    await setDoc(docRef, updatePayload, { merge: true });
-
-                } catch (e) {
-                    alert("Error guardando en la nube: " + e.message);
-                } finally {
-                    setIsSaving(false); // FIN BLOQUEO
-                }
-            };
-
-            // Options Calc
-            useEffect(() => {
-                const uniqueSkids = new Set();
-                const uniqueAlmacenes = new Set();
-                matrixData.forEach(item => {
-                    if (item.skid && item.skid.trim() !== "") uniqueSkids.add(item.skid.trim());
-                    if (item.almacen && item.almacen.trim() !== "") uniqueAlmacenes.add(item.almacen.trim());
-                });
-                uniqueAlmacenes.add("EN OBRA");
-                setSkidOptions(Array.from(uniqueSkids).sort());
-                setAlmacenOptions(Array.from(uniqueAlmacenes).sort());
-            }, [matrixData]);
-
-            // Handlers
-            const handleLogin = async (credentials) => {
-                if(!auth) return;
-                setLoadingAuth(true);
-                try {
-                    const { email, password, isRegistering } = credentials;
-                    if (isRegistering) {
-                        await createUserWithEmailAndPassword(auth, email, password);
-                    } else {
-                        await signInWithEmailAndPassword(auth, email, password);
-                    }
-                } catch (err) {
-                    console.error("Login Error:", err);
-                    alert("Error de autenticación: " + err.message);
-                } finally {
-                    setLoadingAuth(false);
-                }
-            };
-
-            const handleLogout = () => {
-                if(auth) signOut(auth);
-                setUser(null);
-                setMatrixData([]); // Clear local data on logout
-                setRegData([]);
-            };
-
-            const performClearData = () => {
-                // Para limpiar, guardamos arrays vacíos
-                saveToCloud([], [], {});
-                setMatrixData([]); setRegData([]); setManualEdits({}); setUploadStats(null); setFilter("TODOS"); setExpandedRows({});
-                setColumnFilters({});
-                if (fileInputRef.current) fileInputRef.current.value = "";
-                if (regInputRef.current) regInputRef.current.value = "";
-                setIsDeleteModalOpen(false);
-            };
-
-            const toggleRow = (id) => setExpandedRows(prev => ({...prev, [id]: !prev[id]}));
-
-            const handleTagEdit = (tag, field, value) => {
-                if (role !== 'admin') return;
-
-                const updatedEdits = { ...manualEdits };
-                
-                let newEditsForTag = { ...(updatedEdits[tag] || {}), [field]: value };
-                
-                // Logic Auto-Almacen
-                if (field === 'cantRegReal') {
-                    const item = matrixData.find(d => d.tag === tag);
-                    const tot = safeParseInt(newEditsForTag.cantRegTot !== undefined ? newEditsForTag.cantRegTot : (item?.cantRegTot || 0));
-                    const real = safeParseInt(value);
-                    if (tot > 0 && real >= tot) { 
-                         newEditsForTag.almacen = "EN OBRA";
-                    }
-                }
-                
-                updatedEdits[tag] = newEditsForTag;
-                
-                // Optimistic UI Update
-                setManualEdits(updatedEdits);
-                // Save to Cloud (Solo edits)
-                saveToCloud(null, null, updatedEdits);
-            };
-            
-            const handleRegEdit = (tag, field, value) => {
-                if (role !== 'admin') return;
-
-                const newRegData = regData.map(item => {
-                    if(item.tag === tag) {
-                        let newState = item.estadoReg; // Corregido para leer estadoReg en lugar de estadoDoc
-                        if (field === 'fDev' && value) newState = "FINALIZADO";
-                        else if (field === 'fPres' && value) newState = "EN INSPECCIÓN";
-                        else if (field === 'fGen' && value) newState = "EN LABORATORIO";
-                        else if (field === 'fCalib' && value) newState = "CALIBRADO";
-                        return { ...item, [field]: value, estadoReg: newState }; // Corregido: guardar en estadoReg
-                    }
-                    return item;
-                });
-
-                setRegData(newRegData);
-                // Save Reg Data + Edits (null Matrix to skip saving it)
-                saveToCloud(null, newRegData, null);
-            };
-
-            const handleColumnFilterChange = (key, values) => {
-                setColumnFilters(prev => ({
-                    ...prev,
-                    [key]: values
-                }));
-            };
-
-            const calculateState = (item, edit) => {
-                const tot = safeParseInt(edit?.cantRegTot !== undefined ? edit.cantRegTot : item.cantRegTot);
-                const real = safeParseInt(edit?.cantRegReal !== undefined ? edit.cantRegReal : item.cantRegReal);
-                if (tot > 0 && real >= tot) return "INSTALADO";
-                if (real > 0 && real < tot) return "EN PROCESO";
-                return "PENDIENTE";
-            };
-
-            // Filtrado visual
-            const filteredMatrixData = useMemo(() => {
-                if (!hideDeleted) return matrixData;
-                return matrixData.filter(item => {
-                    const est = (item.estado1 || "").toUpperCase();
-                    return !est.includes("ELIMINA");
-                });
-            }, [matrixData, hideDeleted]);
-
-            // STATS CALCS
-            const systemsStats = useMemo(() => {
-                const grouped = {};
-                filteredMatrixData.forEach(item => {
-                    const tag = item.tag?.trim();
-                    const edit = manualEdits[tag];
-                    
-                    const state = calculateState(item, edit);
-                    const isMounted = state === "INSTALADO";
-                    const isInProgress = state === "EN PROCESO";
-                    const key = `${item.sistema || '000'}|${item.subsistema || '000'}`;
-
-                    if (!grouped[key]) grouped[key] = { id: key, sistema: `${item.sistema} - ${item.descSistema}`, descSistema: item.descSistema, subsistema: `${item.subsistema} - ${item.descSubsistema}`, descSubsistema: item.descSubsistema, totalTags: 0, mountedTags: 0, tags: [] };
-
-                    grouped[key].totalTags++;
-                    if (isMounted) grouped[key].mountedTags++;
-                    
-                    const displayAlmacen = ((isMounted || isInProgress) && (!edit?.almacen && !item.almacen)) ? "EN OBRA" : (edit?.almacen !== undefined ? edit.almacen : item.almacen);
-
-                    grouped[key].tags.push({ 
-                        tag, desc: item.descripcion, specialty: item.especialidad, mounted: isMounted, calculatedStatus: state,
-                        skid: edit?.skid !== undefined ? edit.skid : item.skid,
-                        almacen: displayAlmacen, 
-                        aCalibrar: edit?.aCalibrar !== undefined ? edit.aCalibrar : item.aCalibrar,
-                        cantRegTot: edit?.cantRegTot !== undefined ? edit.cantRegTot : item.cantRegTot,
-                        cantRegReal: edit?.cantRegReal !== undefined ? edit.cantRegReal : item.cantRegReal
-                    });
-                });
-                return Object.values(grouped).map(g => ({ ...g, percent: g.totalTags > 0 ? ((g.mountedTags / g.totalTags) * 100).toFixed(1) : "0.0" })).sort((a, b) => a.sistema.localeCompare(b.sistema));
-            }, [filteredMatrixData, manualEdits]);
-
-            const flatData = useMemo(() => {
-                return regData.map(item => {
-                     let status = "PENDIENTE";
-                     if (item.fDev && item.fDev.trim() !== "") status = "FINALIZADO";
-                     else if (item.fPres && item.fPres.trim() !== "") status = "EN INSPECCIÓN";
-                     else if (item.fGen && item.fGen.trim() !== "") status = "EN LABORATORIO";
-                     else if (item.fCalib && item.fCalib.trim() !== "") status = "CALIBRADO";
-                     const estadoRegFisico = (item.ubicReg && item.ubicReg.trim() !== "") ? item.ubicReg : "PENDIENTE";
-                     const ubicacionFisicaReal = (item.ubicacion && item.ubicacion.trim() !== "") ? item.ubicacion : "Sin Dato";
-                     const provision = (item.provision && item.provision.trim() !== "") ? item.provision : "Sin Dato";
-                     const skidStatus = (item.skid && item.skid.trim() !== "") ? item.skid : "Sin Dato";
-
-                     return {
-                         tag: item.tag, ubicacionFisica: ubicacionFisicaReal, ubicacionRegistro: estadoRegFisico, proveedor: item.lab || "Sin Prov.", 
-                         estadoDoc: status, fechaGen: item.fGen, fechaPres: item.fPres, fechaDev: item.fDev, 
-                         fCalib: item.fCalib,
-                         montado: item.montado, provision: provision, skid: skidStatus
-                     };
-                });
-            }, [regData]);
-
-            const totalDocsScope = useMemo(() => {
-                return matrixData.reduce((acc, item) => {
-                    const est1 = cleanStr(item.estado1).toUpperCase();
-                    if (est1.includes("ELIMINA")) return acc;
-                    const edit = manualEdits[item.tag];
-                    const val = safeParseInt(edit?.cantRegTot !== undefined ? edit.cantRegTot : item.cantRegTot);
-                    return acc + val;
-                }, 0);
-            }, [matrixData, manualEdits]);
-
-            const globalProgress = useMemo(() => {
-                let sumTot = 0; let sumReal = 0;
-                matrixData.forEach(item => {
-                    const est1 = cleanStr(item.estado1).toUpperCase();
-                    if (est1.includes("ELIMINA")) return;
-                    const tag = item.tag?.trim();
-                    const edit = manualEdits[tag];
-                    const valTot = safeParseInt(edit?.cantRegTot !== undefined ? edit.cantRegTot : item.cantRegTot);
-                    const valReal = safeParseInt(edit?.cantRegReal !== undefined ? edit.cantRegReal : item.cantRegReal);
-                    sumTot += valTot;
-                    sumReal += valReal;
-                });
-                return sumTot === 0 ? "0.0000" : ((sumReal / sumTot) * 100).toFixed(4);
-            }, [matrixData, manualEdits]);
-
-            const physicalLocationStats = useMemo(() => {
-                const stats = {};
-                const provisions = new Set();
-                flatData.forEach(item => {
-                    const loc = item.ubicacionFisica;
-                    const prov = item.provision;
-                    provisions.add(prov);
-                    if (!stats[loc]) stats[loc] = { name: loc };
-                    stats[loc][prov] = (stats[loc][prov] || 0) + 1;
-                });
-                const sortedData = Object.values(stats).sort((a, b) => a.name.localeCompare(b.name));
-                return { data: sortedData, keys: Array.from(provisions).sort() };
-            }, [flatData]);
-
-            const skidCounts = useMemo(() => {
-                const counts = { ON: 0, OFF: 0 };
-                flatData.forEach(d => {
-                    const val = (d.skid || "").toUpperCase().trim();
-                    if (val === 'ON') counts.ON++;
-                    if (val === 'OFF') counts.OFF++;
-                });
-                return counts;
-            }, [flatData]);
-
-            const uniqueLabs = useMemo(() => {
-                const labs = new Set();
-                regData.forEach(d => {
-                    if(d.lab && d.lab.trim() !== '') labs.add(d.lab.trim());
-                });
-                return Array.from(labs).sort();
-            }, [regData]);
-
-            const specialtyStats = useMemo(() => {
-                const stats = {
-                    "I": { label: "Instrumentación (I)", total: 0, completed: 0, color: "#3b82f6", icon: Activity },
-                    "E": { label: "Electricidad (E)", total: 0, completed: 0, color: "#eab308", icon: Zap },
-                    "P": { label: "Piping (P)", total: 0, completed: 0, color: "#6366f1", icon: Target },
-                    "M": { label: "Mecánica (M)", total: 0, completed: 0, color: "#64748b", icon: Wrench },
-                    "C": { label: "Civil (C)", total: 0, completed: 0, color: "#f97316", icon: Hammer },
-                };
-                matrixData.forEach(item => {
-                    const est1 = (item.estado1 || "").toUpperCase();
-                    if (est1.includes("ELIMINA")) return;
-                    const spec = (item.especialidad || "").toUpperCase();
-                    let key = null;
-                    if (spec.includes("INSTRUMENT") || spec.includes("(I)")) key = "I";
-                    else if (spec.includes("ELECTRIC") || spec.includes("(E)")) key = "E";
-                    else if (spec.includes("PIPING") || spec.includes("(P)")) key = "P";
-                    else if (spec.includes("MEC") || spec.includes("(M)")) key = "M";
-                    else if (spec.includes("CIVIL") || spec.includes("(C)")) key = "C";
-
-                    if (key) {
-                        const edit = manualEdits[item.tag];
-                        const valTot = safeParseInt(edit?.cantRegTot !== undefined ? edit.cantRegTot : item.cantRegTot);
-                        const valReal = safeParseInt(edit?.cantRegReal !== undefined ? edit.cantRegReal : item.cantRegReal);
-                        stats[key].total += valTot;
-                        stats[key].completed += valReal;
-                    }
-                });
-                return Object.values(stats);
-            }, [matrixData, manualEdits]);
-
-            const filteredList = useMemo(() => {
-                // 1. Filtro Global (Select de arriba)
-                let data = filter === "TODOS" ? flatData : flatData.filter(d => d.estadoDoc === filter || d.ubicacion === filter);
-
-                // 2. Filtros por Columna
-                Object.keys(columnFilters).forEach(key => {
-                    const selectedValues = columnFilters[key];
-                    if (selectedValues && selectedValues.length > 0) {
-                        data = data.filter(item => {
-                            const val = item[key] ? String(item[key]) : "(Vacío)";
-                            return selectedValues.includes(val);
-                        });
-                    }
-                });
-
-                return data;
-            }, [flatData, filter, columnFilters]);
-
-            const docStatusCounts = useMemo(() => {
-                const counts = filteredList.reduce((acc, curr) => { const st = curr.estadoDoc || "PENDIENTE"; acc[st] = (acc[st] || 0) + 1; return acc; }, {});
-                return Object.keys(counts).map(key => ({ name: key, value: counts[key] }));
-            }, [filteredList]);
-
-            const registryStatusCounts = useMemo(() => {
-                const counts = filteredList.reduce((acc, curr) => { const st = curr.ubicacionRegistro || "PENDIENTE"; acc[st] = (acc[st] || 0) + 1; return acc; }, {});
-                return Object.keys(counts).map(key => ({ name: key, value: counts[key] }));
-            }, [filteredList]);
-
-            // --- RENDER LOGIC ---
+            // RENDER LOGIC
             if (!user) {
                 return <LoginScreen onLogin={handleLogin} loading={loadingAuth} isConfigured={isConfigured} />;
             }
@@ -1159,11 +882,10 @@
             return (
                 <div className="min-h-screen bg-slate-50 p-6 font-sans relative">
                     <ConfirmModal isOpen={isDeleteModalOpen} onClose={() => setIsDeleteModalOpen(false)} onConfirm={performClearData} />
-                    <SuccessModal isOpen={isSuccessModalOpen} onClose={() => setIsSuccessModalOpen(false)} message={`Datos cargados y sincronizados. Total: ${uploadStats?.total || 0}`} />
+                    <SuccessModal isOpen={isSuccessModalOpen} onClose={() => setIsSuccessModalOpen(false)} message={`Datos cargados correctamente. Total: ${uploadStats?.total || 0}`} />
                     <ApprovalModal isOpen={isApprovalModalOpen} onClose={() => setIsApprovalModalOpen(false)} onConfirm={confirmMatrixLoad} changes={changeStats} />
 
                     <div className="flex flex-col gap-4 mb-6">
-                        {/* HEADER CON INFO DE USUARIO */}
                         <div className="flex justify-between items-center bg-white p-4 rounded-lg shadow-sm border border-slate-200 mb-2">
                             <div className="flex items-center gap-3">
                                 {role === 'admin' ? 
@@ -1178,75 +900,28 @@
                             </div>
                             <button onClick={handleLogout} className="text-red-500 hover:bg-red-50 px-3 py-1 rounded text-sm flex items-center gap-2 font-medium transition-colors"><LogOut size={16}/> Salir</button>
                         </div>
-                        
-                        {/* ERROR MSG BANNER */}
                         {errorMsg && (
                              <div className="bg-red-50 border-l-4 border-red-500 p-4 mb-4 rounded shadow-sm flex items-start gap-3">
                                  <AlertCircle className="text-red-500 shrink-0 mt-0.5" size={20}/>
-                                 <div>
-                                     <h3 className="text-red-800 font-bold text-sm">Error de Conexión</h3>
-                                     <p className="text-red-700 text-sm">{errorMsg}</p>
-                                 </div>
+                                 <div><h3 className="text-red-800 font-bold text-sm">Error de Conexión</h3><p className="text-red-700 text-sm">{errorMsg}</p></div>
                              </div>
                         )}
-
                         <div className="flex flex-col xl:flex-row justify-between items-center bg-white p-6 rounded-lg shadow-sm border border-slate-200">
                             <div>
-                                <h1 className="text-3xl font-bold text-slate-800 flex items-center gap-3">Seguimiento de Obra {uploadStats && <span className="text-xs bg-green-100 text-green-800 px-2 py-1 rounded-full">Cargado: {uploadStats.type}</span>}</h1>
+                                <h1 className="text-3xl font-bold text-slate-800 flex items-center gap-3">Seguimiento de Obra</h1>
                                 <p className="text-slate-500">Gestión Unificada de Matriz de Ingeniería y Avance</p>
                             </div>
-                            
                             <div className="flex gap-2 mt-4 xl:mt-0">
                                 <button onClick={() => setHideDeleted(!hideDeleted)} className={`flex items-center gap-2 px-4 py-2 rounded text-sm border font-medium transition-colors ${hideDeleted ? 'bg-blue-100 text-blue-700 border-blue-300' : 'bg-gray-100 text-gray-500 border-gray-300'}`}>{hideDeleted ? <EyeOff size={16}/> : <Eye size={16}/>} {hideDeleted ? "Ocultando Eliminados" : "Ver Eliminados"}</button>
-                                
-                                <div className="relative">
-                                    <button onClick={() => setShowExportMenu(!showExportMenu)} className="flex items-center gap-2 bg-white border border-slate-300 text-slate-700 px-4 py-2 rounded text-sm hover:bg-slate-50">
-                                        <Save size={16}/> Guardar (CSV) <ChevronDown size={14}/>
-                                    </button>
-                                    {showExportMenu && (
-                                        <>
-                                            <div className="fixed inset-0 z-40" onClick={() => setShowExportMenu(false)}></div>
-                                            <div className="absolute right-0 mt-1 w-56 bg-white rounded-md shadow-lg z-50 border border-slate-200 py-1">
-                                                <button onClick={() => { downloadMatrix(); setShowExportMenu(false); }} className="w-full text-left px-4 py-2 text-sm text-slate-700 hover:bg-slate-50 flex items-center gap-2">
-                                                    <Layers size={14}/> Matriz ABM
-                                                </button>
-                                                <button onClick={() => { downloadRegistry(); setShowExportMenu(false); }} className="w-full text-left px-4 py-2 text-sm text-slate-700 hover:bg-slate-50 flex items-center gap-2">
-                                                    <LayoutDashboard size={14}/> Reg. Instrumentos
-                                                </button>
-                                            </div>
-                                        </>
-                                    )}
-                                </div>
-
-                                {/* CONTROLES DE ADMIN */}
+                                <button onClick={downloadExport} className="flex items-center gap-2 bg-white border border-slate-300 text-slate-700 px-4 py-2 rounded text-sm hover:bg-slate-50"><Save size={16}/> Guardar (CSV)</button>
                                 {role === 'admin' && (
                                     <>
                                         <div className="h-8 w-px bg-slate-300 mx-2"></div>
-                                        <button 
-                                            onClick={() => setIsDeleteModalOpen(true)} 
-                                            disabled={loadingData || isSaving}
-                                            className={`flex items-center gap-2 border px-4 py-2 rounded text-sm transition-colors ${loadingData || isSaving ? 'bg-slate-100 text-slate-400 border-slate-200 cursor-not-allowed' : 'bg-white border-red-200 text-red-600 hover:bg-red-50'}`}
-                                        >
-                                            <Trash2 size={16}/> Limpiar Nube
-                                        </button>
-                                        
+                                        <button onClick={() => setIsDeleteModalOpen(true)} disabled={loadingData || isSaving} className={`flex items-center gap-2 border px-4 py-2 rounded text-sm transition-colors ${loadingData || isSaving ? 'bg-slate-100 text-slate-400 cursor-not-allowed' : 'bg-white border-red-200 text-red-600 hover:bg-red-50'}`}><Trash2 size={16}/> Limpiar Nube</button>
                                         <input type="file" ref={fileInputRef} onChange={handleMatrixUpload} accept=".csv" className="hidden" disabled={loadingData || isSaving} />
-                                        <button 
-                                            onClick={() => fileInputRef.current.click()} 
-                                            disabled={loadingData || isSaving}
-                                            className={`flex items-center gap-2 text-white px-4 py-2 rounded text-sm shadow-md transform active:scale-95 transition-transform ${loadingData || isSaving ? 'bg-purple-400 cursor-not-allowed' : 'bg-purple-600 hover:bg-purple-700'}`}
-                                        >
-                                            <Upload size={16}/> Matriz
-                                        </button>
-                                        
+                                        <button onClick={() => fileInputRef.current.click()} disabled={loadingData || isSaving} className={`flex items-center gap-2 text-white px-4 py-2 rounded text-sm shadow-md transform active:scale-95 transition-transform ${loadingData || isSaving ? 'bg-purple-400 cursor-not-allowed' : 'bg-purple-600 hover:bg-purple-700'}`}><Upload size={16}/> Matriz</button>
                                         <input type="file" ref={regInputRef} onChange={handleRegUpload} accept=".csv" className="hidden" disabled={loadingData || isSaving} />
-                                        <button 
-                                            onClick={() => regInputRef.current.click()} 
-                                            disabled={loadingData || isSaving}
-                                            className={`flex items-center gap-2 text-white px-4 py-2 rounded text-sm shadow-md transform active:scale-95 transition-transform ${loadingData || isSaving ? 'bg-blue-400 cursor-not-allowed' : 'bg-blue-600 hover:bg-blue-700'}`}
-                                        >
-                                            <Upload size={16}/> Registros
-                                        </button>
+                                        <button onClick={() => regInputRef.current.click()} disabled={loadingData || isSaving} className={`flex items-center gap-2 text-white px-4 py-2 rounded text-sm shadow-md transform active:scale-95 transition-transform ${loadingData || isSaving ? 'bg-blue-400 cursor-not-allowed' : 'bg-blue-600 hover:bg-blue-700'}`}><Upload size={16}/> Registros</button>
                                     </>
                                 )}
                             </div>
@@ -1259,14 +934,14 @@
 
                     {activeTab === 'dashboard' && (
                         <div className="animate-enter">
-                            <div className="grid grid-cols-1 md:grid-cols-5 gap-4 mb-8">
+                            {/* GRÁFICOS */}
+                             <div className="grid grid-cols-1 md:grid-cols-5 gap-4 mb-8">
                                 <MetricCard title="Instrumentos Reg." value={flatData.length} percentage="100" icon={Activity} color="#6366f1" />
                                 <MetricCard title="Finalizados" value={flatData.filter(d => d.estadoDoc === "FINALIZADO").length} percentage={flatData.length > 0 ? ((flatData.filter(d => d.estadoDoc === "FINALIZADO").length / flatData.length) * 100).toFixed(0) : 0} icon={CheckCircle} color="#15803d" />
                                 <MetricCard title="En Inspección" value={flatData.filter(d => d.estadoDoc === "EN INSPECCIÓN").length} percentage={flatData.length > 0 ? ((flatData.filter(d => d.estadoDoc === "EN INSPECCIÓN").length / flatData.length) * 100).toFixed(0) : 0} icon={Clock} color="#eab308" />
                                 <MetricCard title="Laboratorio" value={flatData.filter(d => d.estadoDoc === "EN LABORATORIO").length} icon={Wrench} color="#f97316" />
                                 <MetricCard title="Estado Skid" value={`ON: ${skidCounts.ON} | OFF: ${skidCounts.OFF}`} icon={Box} color="#8b5cf6" />
                             </div>
-
                             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
                                 <div className="bg-white p-6 rounded-lg shadow border border-slate-100 h-80">
                                     <h3 className="text-lg font-bold text-slate-700 mb-4">Estado Documental</h3>
@@ -1276,9 +951,7 @@
                                             <XAxis type="number" />
                                             <YAxis dataKey="name" type="category" width={100} tick={{fontSize: 10}} />
                                             <Tooltip />
-                                            <Bar dataKey="value" fill="#3b82f6" radius={[0,4,4,0]}>
-                                                 <LabelList dataKey="value" position="right" />
-                                            </Bar>
+                                            <Bar dataKey="value" fill="#3b82f6" radius={[0,4,4,0]}><LabelList dataKey="value" position="right" /></Bar>
                                         </BarChart>
                                     </ResponsiveContainer>
                                 </div>
@@ -1289,8 +962,7 @@
                                             <Pie data={registryStatusCounts} cx="50%" cy="50%" innerRadius={40} outerRadius={70} fill="#8884d8" paddingAngle={5} dataKey="value" label>
                                                 {registryStatusCounts.map((entry, index) => <Cell key={`cell-${index}`} fill={Object.values(COLORS)[index % Object.values(COLORS).length]} />)}
                                             </Pie>
-                                            <Tooltip />
-                                            <Legend />
+                                            <Tooltip /><Legend />
                                         </PieChart>
                                     </ResponsiveContainer>
                                 </div>
@@ -1301,8 +973,7 @@
                                             <CartesianGrid strokeDasharray="3 3" horizontal={false} />
                                             <XAxis type="number" />
                                             <YAxis dataKey="name" type="category" width={100} tick={{fontSize: 10}} />
-                                            <Tooltip />
-                                            <Legend wrapperStyle={{fontSize: "10px"}}/>
+                                            <Tooltip /><Legend wrapperStyle={{fontSize: "10px"}}/>
                                             {physicalLocationStats.keys.map((key, index) => (
                                                 <Bar key={key} dataKey={key} stackId="a" fill={COLORS_LIST[index % COLORS_LIST.length]} />
                                             ))}
@@ -1310,20 +981,13 @@
                                     </ResponsiveContainer>
                                 </div>
                             </div>
-
                             <div className="bg-white rounded-lg shadow overflow-hidden border border-slate-200">
                                 <div className="p-5 border-b border-slate-200 flex justify-between items-center bg-slate-50">
                                     <h3 className="text-lg font-bold text-slate-700">Listado de Registros (ABM)</h3>
                                     <div className="flex gap-2">
-                                        {/* Botón Borrar Filtros */}
-                                        <button onClick={() => setColumnFilters({})} className="flex items-center gap-1 text-red-500 text-sm hover:bg-red-50 px-3 py-1 rounded transition-colors" title="Borrar filtros de columnas">
-                                            <XCircle size={16}/> Borrar Filtros
-                                        </button>
+                                        <button onClick={() => setColumnFilters({})} className="flex items-center gap-1 text-red-500 text-sm hover:bg-red-50 px-3 py-1 rounded transition-colors" title="Borrar filtros de columnas"><XCircle size={16}/> Borrar Filtros</button>
                                         <select className="select-edit w-48" value={filter} onChange={(e) => setFilter(e.target.value)}>
-                                            <option value="TODOS">Todos</option>
-                                            <option value="FINALIZADO">Finalizados</option>
-                                            <option value="EN INSPECCIÓN">En Inspección</option>
-                                            <option value="EN OBRA">En Obra</option>
+                                            <option value="TODOS">Todos</option><option value="FINALIZADO">Finalizados</option><option value="EN INSPECCIÓN">En Inspección</option><option value="EN OBRA">En Obra</option>
                                         </select>
                                     </div>
                                 </div>
@@ -1350,16 +1014,8 @@
                                                 <tr key={idx} className="bg-white hover:bg-slate-50">
                                                     <td className="px-6 py-3 font-medium">{row.tag}</td>
                                                     <td className="px-2 py-1">
-                                                        <select 
-                                                            disabled={role !== 'admin'}
-                                                            className="select-edit" 
-                                                            value={row.proveedor === "Sin Prov." ? "" : row.proveedor} 
-                                                            onChange={(e) => handleRegEdit(row.tag, 'lab', e.target.value)}
-                                                        >
-                                                            <option value="">-</option>
-                                                            {uniqueLabs.map(lab => (
-                                                                <option key={lab} value={lab}>{lab}</option>
-                                                            ))}
+                                                        <select disabled={role !== 'admin'} className="select-edit" value={row.proveedor === "Sin Prov." ? "" : row.proveedor} onChange={(e) => handleRegEdit(row.tag, 'lab', e.target.value)}>
+                                                            <option value="">-</option>{uniqueLabs.map(lab => (<option key={lab} value={lab}>{lab}</option>))}
                                                         </select>
                                                     </td>
                                                     <td className="px-2 py-1"><input disabled={role !== 'admin'} type="date" className="input-edit" value={row.fCalib || ''} onChange={(e) => handleRegEdit(row.tag, 'fCalib', e.target.value)}/></td>
@@ -1367,46 +1023,23 @@
                                                     <td className="px-2 py-1"><input disabled={role !== 'admin' || !row.fechaGen} type="date" className="input-edit" value={row.fechaPres} onChange={(e) => handleRegEdit(row.tag, 'fPres', e.target.value)}/></td>
                                                     <td className="px-2 py-1"><input disabled={role !== 'admin' || !row.fechaPres} type="date" className="input-edit" value={row.fechaDev} onChange={(e) => handleRegEdit(row.tag, 'fDev', e.target.value)}/></td>
                                                     <td className="px-6 py-3"><span className={`px-2 py-1 rounded text-xs font-bold ${row.estadoDoc === 'FINALIZADO' ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'}`}>{row.estadoDoc}</span></td>
-                                                    
                                                     <td className="px-2 py-1">
-                                                        <select 
-                                                            disabled={role !== 'admin'}
-                                                            className="select-edit" 
-                                                            value={row.ubicacionFisica === "Sin Dato" ? "" : row.ubicacionFisica} 
-                                                            onChange={(e) => handleRegEdit(row.tag, 'ubicacion', e.target.value)}
-                                                        >
-                                                            <option value="">-</option>
-                                                            {uniqueLocations.map(loc => (
-                                                                <option key={loc} value={loc}>{loc}</option>
-                                                            ))}
+                                                        <select disabled={role !== 'admin'} className="select-edit" value={row.ubicacionFisica === "Sin Dato" ? "" : row.ubicacionFisica} onChange={(e) => handleRegEdit(row.tag, 'ubicacion', e.target.value)}>
+                                                            <option value="">-</option>{uniqueLocations.map(loc => (<option key={loc} value={loc}>{loc}</option>))}
                                                         </select>
                                                     </td>
                                                     <td className="px-2 py-1">
-                                                        <select 
-                                                            disabled={role !== 'admin'}
-                                                            className="select-edit" 
-                                                            value={row.provision === "Sin Dato" ? "" : row.provision} 
-                                                            onChange={(e) => handleRegEdit(row.tag, 'provision', e.target.value)}
-                                                        >
-                                                            <option value="">-</option>
-                                                            {uniqueProvisions.map(prov => (
-                                                                <option key={prov} value={prov}>{prov}</option>
-                                                            ))}
+                                                        <select disabled={role !== 'admin'} className="select-edit" value={row.provision === "Sin Dato" ? "" : row.provision} onChange={(e) => handleRegEdit(row.tag, 'provision', e.target.value)}>
+                                                            <option value="">-</option>{uniqueProvisions.map(prov => (<option key={prov} value={prov}>{prov}</option>))}
                                                         </select>
                                                     </td>
-
                                                     <td className="px-6 py-3 font-bold text-right text-slate-600">{row.ubicacionRegistro}</td>
                                                     <td className="px-2 py-1">
                                                         <select disabled={role !== 'admin'} className="select-edit" value={row.montado} onChange={(e) => handleRegEdit(row.tag, 'montado', e.target.value)}>
-                                                            <option value="SIN MONTAR">SIN MONTAR</option>
-                                                            <option value="MONTADO">MONTADO</option>
+                                                            <option value="SIN MONTAR">SIN MONTAR</option><option value="MONTADO">MONTADO</option>
                                                         </select>
                                                     </td>
-                                                    <td className="px-2 py-1 text-center">
-                                                        <span className={`px-2 py-1 rounded text-xs font-bold ${row.skid === 'Sin Dato' ? 'bg-red-100 text-red-700' : 'bg-slate-100 text-slate-600'}`}>
-                                                            {row.skid}
-                                                        </span>
-                                                    </td>
+                                                    <td className="px-2 py-1 text-center"><span className={`px-2 py-1 rounded text-xs font-bold ${row.skid === 'Sin Dato' ? 'bg-red-100 text-red-700' : 'bg-slate-100 text-slate-600'}`}>{row.skid}</span></td>
                                                 </tr>
                                             ))}
                                         </tbody>
@@ -1415,51 +1048,29 @@
                             </div>
                         </div>
                     )}
-
                     {activeTab === 'systems' && (
                         <div className="animate-enter">
                             <div className="grid grid-cols-1 md:grid-cols-5 gap-4 mb-6">
                                 {specialtyStats.map((spec) => (
-                                    <MetricCard 
-                                        key={spec.label} 
-                                        title={spec.label} 
-                                        value={`${spec.completed}/${spec.total}`} 
-                                        percentage={spec.total > 0 ? ((spec.completed / spec.total) * 100).toFixed(0) : 0} 
-                                        icon={spec.icon} 
-                                        color={spec.color} 
-                                        compact={true}
-                                    />
+                                    <MetricCard key={spec.label} title={spec.label} value={`${spec.completed}/${spec.total}`} percentage={spec.total > 0 ? ((spec.completed / spec.total) * 100).toFixed(0) : 0} icon={spec.icon} color={spec.color} compact={true} />
                                 ))}
                             </div>
-
                             <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
                                 <div className="bg-white p-4 rounded-lg shadow border-l-4 border-purple-500">
-                                    <h3 className="text-sm font-medium text-gray-500 uppercase">Subsistemas</h3>
-                                    <p className="text-3xl font-bold text-gray-800">{systemsStats.length}</p>
+                                    <h3 className="text-sm font-medium text-gray-500 uppercase">Subsistemas</h3><p className="text-3xl font-bold text-gray-800">{systemsStats.length}</p>
                                 </div>
                                 <div className="bg-white p-4 rounded-lg shadow border-l-4 border-blue-500">
-                                    <h3 className="text-sm font-medium text-gray-500 uppercase">Total Tags</h3>
-                                    <p className="text-3xl font-bold text-gray-800">{filteredMatrixData.length}</p>
+                                    <h3 className="text-sm font-medium text-gray-500 uppercase">Total Tags</h3><p className="text-3xl font-bold text-gray-800">{filteredMatrixData.length}</p>
                                 </div>
                                 <div className="bg-white p-4 rounded-lg shadow border-l-4 border-cyan-500">
                                     <h3 className="text-sm font-medium text-gray-500 uppercase">Total Registros</h3>
-                                    <div className="flex justify-between items-center">
-                                        <p className="text-3xl font-bold text-gray-800">{totalDocsScope}</p>
-                                        <div className="p-2 bg-cyan-50 rounded-full">
-                                            <FileText size={20} className="text-cyan-600" />
-                                        </div>
-                                    </div>
+                                    <div className="flex justify-between items-center"><p className="text-3xl font-bold text-gray-800">{totalDocsScope}</p><div className="p-2 bg-cyan-50 rounded-full"><FileText size={20} className="text-cyan-600" /></div></div>
                                 </div>
-
                                 <div className="bg-white p-4 rounded-lg shadow border-l-4 border-green-600">
                                     <h3 className="text-sm font-medium text-gray-500 uppercase">Avance Global</h3>
-                                    <p className="text-3xl font-bold text-gray-800 flex items-center gap-2">
-                                        {globalProgress}%
-                                        <Activity size={20} className="text-green-500"/>
-                                    </p>
+                                    <p className="text-3xl font-bold text-gray-800 flex items-center gap-2">{globalProgress}%<Activity size={20} className="text-green-500"/></p>
                                 </div>
                             </div>
-
                             <div className="bg-white rounded-lg shadow overflow-hidden border border-slate-200">
                                 <div className="p-4 bg-slate-50 border-b border-slate-200 font-bold text-slate-700">Detalle de Montaje por Subsistema (ABM)</div>
                                 <div className="overflow-x-auto">
