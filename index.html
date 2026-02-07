@@ -62,7 +62,7 @@
         import React, { useState, useMemo, useRef, useEffect } from 'react';
         import { createRoot } from 'react-dom/client';
         import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, PieChart, Pie, Cell, ResponsiveContainer, Label, LabelList } from 'recharts';
-        import { AlertCircle, CheckCircle, Clock, Activity, Upload, Trash2, HardHat, Download, X, AlertTriangle, Target, Layers, FileSpreadsheet, LayoutDashboard, ChevronDown, ChevronRight, Boxes, PlayCircle, Wrench, Zap, Hammer, FileWarning, Package, Truck, ClipboardCheck, Edit3, Save, Eye, EyeOff, FileCheck, RefreshCw, CalendarDays, Search, FileText, MapPin, Box, LogIn, User, Shield, LogOut, Database, Settings } from 'lucide-react';
+        import { AlertCircle, CheckCircle, Clock, Activity, Upload, Trash2, HardHat, Download, X, AlertTriangle, Target, Layers, FileSpreadsheet, LayoutDashboard, ChevronDown, ChevronRight, Boxes, PlayCircle, Wrench, Zap, Hammer, FileWarning, Package, Truck, ClipboardCheck, Edit3, Save, Eye, EyeOff, FileCheck, RefreshCw, CalendarDays, Search, FileText, MapPin, Box, LogIn, User, Shield, LogOut, Database, Settings, Filter, XCircle } from 'lucide-react';
         
         // --- FIREBASE IMPORTS ---
         import { initializeApp } from "firebase/app";
@@ -174,29 +174,12 @@
         const COLORS = { blue: "#3b82f6", green: "#10b981", orange: "#f97316", red: "#ef4444", yellow: "#eab308", purple: "#a855f7", indigo: "#6366f1", gray: "#64748b", teal: "#14b8a6", pink: "#db2777", cyan: "#06b6d4" };
         const COLORS_LIST = Object.values(COLORS);
 
-        // --- ICONO FILTRO NATIVO ---
-        const FilterIconSvg = ({ size = 14, fill = "none", className = "" }) => (
-            <svg 
-                xmlns="http://www.w3.org/2000/svg" 
-                width={size} 
-                height={size} 
-                viewBox="0 0 24 24" 
-                fill={fill} 
-                stroke="currentColor" 
-                strokeWidth="2" 
-                strokeLinecap="round" 
-                strokeLinejoin="round" 
-                className={className}
-            >
-                <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3" />
-            </svg>
-        );
-
-        // --- COMPONENTES UI (MODALES & FILTROS) ---
+        // --- COMPONENTES UI (FILTRO DE COLUMNA) ---
         const TableFilter = ({ columnKey, data, currentFilter, onFilterChange, title }) => {
             const [isOpen, setIsOpen] = useState(false);
             const [searchTerm, setSearchTerm] = useState("");
             
+            // Valores únicos ordenados
             const uniqueValues = useMemo(() => {
                 const values = new Set();
                 if (Array.isArray(data)) {
@@ -242,7 +225,8 @@
                         onClick={(e) => { e.stopPropagation(); setIsOpen(!isOpen); }} 
                         className={`p-1 rounded hover:bg-slate-200 transition-colors ${isActive ? 'text-blue-600 bg-blue-50' : 'text-slate-400 opacity-0 group-hover:opacity-100 focus:opacity-100'}`}
                     >
-                        <FilterIconSvg size={14} fill={isActive ? "currentColor" : "none"} />
+                        {/* Usamos SVG nativo para evitar problemas de importación */}
+                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill={isActive ? "currentColor" : "none"} stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></svg>
                     </button>
                     
                     {isOpen && (
@@ -288,6 +272,7 @@
             );
         };
 
+        // --- COMPONENTES UI (MODALES) ---
         const ConfirmModal = ({ isOpen, onClose, onConfirm }) => {
             if (!isOpen) return null;
             return (
@@ -571,7 +556,7 @@
             const [regData, setRegData] = useState([]); 
             const [activeTab, setActiveTab] = useState("dashboard"); 
             const [filter, setFilter] = useState("TODOS");
-            const [columnFilters, setColumnFilters] = useState({}); 
+            const [columnFilters, setColumnFilters] = useState({}); // NUEVO: Filtros por Columna
             const [expandedRows, setExpandedRows] = useState({}); 
             const [manualEdits, setManualEdits] = useState({});
             
@@ -601,7 +586,6 @@
 
             // --- FUNCIONES DEFINIDAS ANTES DEL RENDER ---
 
-            // Definir confirmMatrixLoad ANTES de su uso en el render y antes de otros métodos que lo referencien
             const confirmMatrixLoad = () => {
                 if (pendingData) {
                     setMatrixData(pendingData);
@@ -1167,22 +1151,6 @@
                 return Object.keys(counts).map(key => ({ name: key, value: counts[key] }));
             }, [filteredList]);
 
-            const uniqueLocations = useMemo(() => {
-                const locs = new Set();
-                regData.forEach(d => {
-                    if(d.ubicacion && d.ubicacion.trim() !== '') locs.add(d.ubicacion.trim());
-                });
-                return Array.from(locs).sort();
-            }, [regData]);
-
-            const uniqueProvisions = useMemo(() => {
-                const provs = new Set();
-                regData.forEach(d => {
-                    if(d.provision && d.provision.trim() !== '') provs.add(d.provision.trim());
-                });
-                return Array.from(provs).sort();
-            }, [regData]);
-
             // --- RENDER LOGIC ---
             if (!user) {
                 return <LoginScreen onLogin={handleLogin} loading={loadingAuth} isConfigured={isConfigured} />;
@@ -1346,12 +1314,18 @@
                             <div className="bg-white rounded-lg shadow overflow-hidden border border-slate-200">
                                 <div className="p-5 border-b border-slate-200 flex justify-between items-center bg-slate-50">
                                     <h3 className="text-lg font-bold text-slate-700">Listado de Registros (ABM)</h3>
-                                    <select className="select-edit w-48" value={filter} onChange={(e) => setFilter(e.target.value)}>
-                                        <option value="TODOS">Todos</option>
-                                        <option value="FINALIZADO">Finalizados</option>
-                                        <option value="EN INSPECCIÓN">En Inspección</option>
-                                        <option value="EN OBRA">En Obra</option>
-                                    </select>
+                                    <div className="flex gap-2">
+                                        {/* Botón Borrar Filtros */}
+                                        <button onClick={() => setColumnFilters({})} className="flex items-center gap-1 text-red-500 text-sm hover:bg-red-50 px-3 py-1 rounded transition-colors" title="Borrar filtros de columnas">
+                                            <XCircle size={16}/> Borrar Filtros
+                                        </button>
+                                        <select className="select-edit w-48" value={filter} onChange={(e) => setFilter(e.target.value)}>
+                                            <option value="TODOS">Todos</option>
+                                            <option value="FINALIZADO">Finalizados</option>
+                                            <option value="EN INSPECCIÓN">En Inspección</option>
+                                            <option value="EN OBRA">En Obra</option>
+                                        </select>
+                                    </div>
                                 </div>
                                 <div className="overflow-x-auto max-h-96">
                                     <table className="w-full text-sm text-left text-slate-600">
